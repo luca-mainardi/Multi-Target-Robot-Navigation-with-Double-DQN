@@ -43,6 +43,29 @@
     background: white;
 }
 
+.cell_kitchen {
+    /* center the cell content */
+    justify-content: center;
+    align-items: center;
+    display: flex;
+    font-family: Arial, serif;
+    font-size: 10px;
+    font-weight: bold;
+    background: yellow; /* Example color */
+}
+
+.cell_table {
+    /* center the cell content */
+    justify-content: center;
+    align-items: center;
+    display: flex;
+    font-family: Arial, serif;
+    font-size: 10px;
+    font-weight: bold;
+    background: saddlebrown; /* Example color */
+}
+
+
 .cell_target {
     /* center the cell content */
     justify-content: center;

@@ -43,7 +43,9 @@ def draw_grid(grid):
                  1: 'cell_boundary',
                  2: 'cell_obstacle',
                  3: 'cell_target',
-                 4: 'cell_charger',}
+                 4: 'cell_charger',
+                 5: 'cell_kitchen',
+                 6: 'cell_table',}
     
     return {'grid': render_template(
         'grid.html',
@@ -73,6 +75,8 @@ def build_grid():
         targets: a list of tuples (x,y) of target locations.
         chargers: a list of tuples (x,y) of charger locations.
         walls: a list of tuples (x,y) of wall locations.
+        kitchens: a list of tuples (x,y) of kitchen locations.
+        tables: a list of tuples (x,y) of table locations.
         save: boolean (true, false) to save the current grid to a file.
         name: filename to save the current grid to.
      """
@@ -80,9 +84,11 @@ def build_grid():
     # Get properties of the grid from the request
     n_rows = int(request.args.get('height'))
     n_cols = int(request.args.get('width'))
-    obstacles = ast.literal_eval(request.args.get('obstacles'))
-    targets = ast.literal_eval(request.args.get('targets'))
-    chargers = ast.literal_eval(request.args.get('chargers'))
+    obstacles = ast.literal_eval(request.args.get('obstacles', '[]'))
+    targets = ast.literal_eval(request.args.get('targets', '[]'))
+    chargers = ast.literal_eval(request.args.get('chargers', '[]'))
+    kitchens = ast.literal_eval(request.args.get('kitchens', '[]'))
+    tables = ast.literal_eval(request.args.get('tables', '[]'))
     to_save = False if request.args.get('save') == 'false' else True
     name = str(request.args.get('name'))
 
@@ -94,7 +100,11 @@ def build_grid():
         grid.place_object(x, y, "target")
     for (x, y) in chargers:
         grid.place_object(x, y, "charger")
-    
+    for (x, y) in tables:
+        grid.place_object(x, y, "tables")
+    for (x, y) in kitchens:
+        grid.place_object(x, y, "kitchens")
+
     drawn_grid = draw_grid(grid)
 
     # If we need to save it, do so

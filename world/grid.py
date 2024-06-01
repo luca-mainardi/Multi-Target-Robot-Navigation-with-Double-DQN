@@ -16,9 +16,10 @@ class Grid:
         - Empty: 0,
         - Boundary: 1,
         - Obstacle: 2,
-        - Dirt: 3,
+        - Target: 3,
         - Charger: 4
-
+        - Kitchen: 5
+        - Table: 6
         Args:
             n_cols: Number of grid columns.
             n_rows: Number of grid rows.
@@ -37,7 +38,9 @@ class Grid:
             "boundary": 1,
             "obstacle": 2,
             "target": 3,
-            "charger": 4
+            "charger": 4,
+            "kitchen": 5,
+            "table": 6
         }
 
     def place_object(self, x, y, type):

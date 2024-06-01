@@ -16,7 +16,8 @@
     <option value="obstacle">obstacle</option>
     <option value="target">target</option>
     <option value="charger">charger</option>
-    
+    <option value="kitchen">kitchen</option>
+    <option value="table">table</option>
 </select>
 <label for="grid_name">Grid name</label>
 <input type="text" id="grid_name" name="name">
@@ -40,6 +41,16 @@
         for (let i = 0; i < chargers.length; i++) {
             c_coords.push(chargers[i].id);
         }
+        let kitchens = document.getElementsByClassName("cell_kitchen");
+        let k_coords = Array();
+        for (let i = 0; i < kitchens.length; i++) {
+            k_coords.push(kitchens[i].id);
+        }
+        let tables = document.getElementsByClassName("cell_table");
+        let tab_coords = Array();
+        for (let i = 0; i < tables.length; i++) {
+            tab_coords.push(tables[i].id);
+        }
         let height = document.getElementById('height').value;
         let width = document.getElementById('width').value;
         $.ajax({
@@ -51,6 +62,8 @@
                 obstacles: '[' + ob_coords.join(',') + ']',
                 targets: '[' + t_coords.join(',') + ']',
                 chargers: '[' + c_coords.join(',') + ']',
+                kitchens: '[' + k_coords.join(',') + ']',
+                tables: '[' + tab_coords.join(',') + ']',
                 save: save,
                 name: name
             },
@@ -68,7 +81,9 @@
         let type = document.getElementById('draw').value;
         if ((tile.className === 'cell_obstacle')
             || (tile.className === 'cell_target')
-            || (tile.className === 'cell_charger')) {
+            || (tile.className === 'cell_charger')
+            || (tile.className === 'cell_kitchen')
+            || (tile.className === 'cell_table')) {
             // If there's already something on the tile AND it was one of the placeable tile types, make it empty again.
             tile.className = 'cell_empty';
         } else if (tile.className === 'cell_empty') {
@@ -79,7 +94,11 @@
                 tile.className = 'cell_target'
             } else if (type === 'charger') {
                 tile.className = 'cell_charger'
-            } 
+            } else if (type === 'kitchen') {
+                tile.className = 'cell_kitchen'
+            } else if (type === 'table') {
+                tile.className = 'cell_table'
+            }
         }
     }
 

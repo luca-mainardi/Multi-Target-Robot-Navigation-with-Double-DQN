@@ -15,13 +15,17 @@ class GUI:
         (255, 255, 255),  # Empty cell
         (57, 57, 57),     # Boundary cell
         (57, 57, 57),     # Obstacle cell
-        (34, 139, 34),    # Dirt cell
+        (34, 139, 34),    # Target cell
         (255, 119, 0),    # Charger cell
+        (255, 255, 0),    # Kitchen cell
+        (139, 69, 19),    # Table cell
     ]
     INFO_NAME_MAP = [
         ("cumulative_reward", "Cumulative reward:"),
         ("total_steps", "Total steps:"),
         ("total_failed_move", "Total failed moves:"),
+        ("agent_storage_level", "Agent Storage Level:"),
+
         # ("total_targets_reached", "Total targets reached:"),
         ("fps", "FPS:"),
     ]
@@ -81,7 +85,8 @@ class GUI:
                 "total_failed_move": 0,
                 "fps": "0.0",
                 "total_steps": 0,
-                "cumulative_reward": 0}
+                "cumulative_reward": 0,
+                "agent_storage_level": 0}
 
     def _initial_render(self):
         """Initial render of the environment. Also shows loading text."""
@@ -209,7 +214,7 @@ class GUI:
 
 
     def render(self, grid_cells: np.ndarray, agent_pos: tuple[int, int],
-               info: dict[str, any], reward: int, is_single_step: bool = False):
+               info: dict[str, any], reward: int, agent_storage_level: int, is_single_step: bool = False):
         """Render the environment.
 
         Args:
@@ -237,6 +242,7 @@ class GUI:
         self.stats["total_failed_move"] += failed_move
 
         self.stats["cumulative_reward"] += reward
+        self.stats["agent_storage_level"] = agent_storage_level  # Update storage level
 
         # Create a surface to actually draw on
         background = pygame.Surface(self.window.get_size()).convert()

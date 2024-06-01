@@ -100,6 +100,13 @@ class Environment:
             self.target_spf = 1. / target_fps
         self.gui = None
 
+        self.grid = Grid.load_grid(self.grid_fp).cells
+        for row in range(self.grid.shape[0]):
+            for col in range(self.grid.shape[1]):
+                if self.grid[row, col] == 6:  # 6 represents a table cell
+                    self.customers.append((row, col))
+                if self.grid[row, col] == 5:
+                    self.kitchen_cells.append((row, col))
 
     def _reset_info(self) -> dict:
         """Resets the info dictionary.
@@ -259,7 +266,7 @@ class Environment:
                 paused_info = self._reset_info()
                 paused_info["agent_moved"] = True
                 self.gui.render(self.grid, self.agent_pos, paused_info,
-                                0, is_single_step)    
+                                0, self.agent_storage_level, is_single_step)
 
         # Add stochasticity into the agent action
         val = random.random()
@@ -281,24 +288,26 @@ class Environment:
             reward = self.reward_fn(self.grid, new_pos)
 
         elif actual_action == 4:  # delivery
-            self.agent_storage_level -= 1
-            delivery_pickup_case = 1
+            self.agent_storage_level = max(0, self.agent_storage_level - 1)
+            delivery_pickup_case = 2
             self.world_stats["total_failed_moves"] += 1
 
             for customer in self.customers:
                 if self.calc_manhattan_distance(customer, self.agent_pos) < 2:
                     self.world_stats["total_failed_moves"] -= 1
-                    delivery_pickup_case = 0
+                    delivery_pickup_case = 1
                     self.customers.remove(customer)
                     break
 
             reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
+            if reward == 50:
+                print("HERE")
 
         elif actual_action == 5:  # pickup
             if self.grid[self.agent_pos] != 5:
-                delivery_pickup_case = 2
-            else:
                 delivery_pickup_case = 3
+            else:
+                delivery_pickup_case = 4
             reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
 
         self.world_stats["cumulative_reward"] += reward
@@ -309,7 +318,7 @@ class Environment:
             if time_to_wait > 0:
                 sleep(time_to_wait)
             self.gui.render(self.grid, self.agent_pos, self.info,
-                            reward, is_single_step)
+                            reward, self.agent_storage_level, is_single_step)
 
         return self.agent_pos, reward, self.terminal_state, self.info
 
@@ -335,17 +344,17 @@ class Environment:
 
         if delivery_pickup_case:
             match delivery_pickup_case:
-                case 0:    # Successful delivery
-                    reward = 10
-                case 1:    # Unsuccessful delivery
+                case 1:    # Successful delivery
+                    reward = 50
+                case 2:    # Unsuccessful delivery
                     reward = -4
-                case 2:    # Unsuccessful pickup
+                case 3:    # Unsuccessful pickup
                     reward = -2
-                case 3:
+                case 4:
                     reward = 0
         else:
             match grid[agent_pos]:
-                case 0:  # Moved to an empty tile
+                case 0 | 5:  # Moved to an empty or kitchen tile
                     reward = -1
                 case 1 | 2 | 6:  # Moved to a wall or obstacle
                     reward = -5

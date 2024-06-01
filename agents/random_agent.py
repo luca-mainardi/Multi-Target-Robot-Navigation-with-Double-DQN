@@ -14,4 +14,4 @@ class RandomAgent(BaseAgent):
         pass
 
     def take_action(self, state: tuple[int, int]) -> int:
-        return randint(0, 3)
+        return randint(0, 5)

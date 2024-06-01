@@ -51,8 +51,7 @@ def draw_grid(grid):
         'grid.html',
         height=30, width=30,
         n_rows=grid.n_rows, n_cols=grid.n_cols,
-        room_config=grid.cells, materials=materials,
-        
+        room_config=grid.cells, materials=materials
     )}
 
 
@@ -102,9 +101,9 @@ def build_grid():
     for (x, y) in chargers:
         grid.place_object(x, y, "charger")
     for (x, y) in tables:
-        grid.place_object(x, y, "tables")
+        grid.place_object(x, y, "table")
     for (x, y) in kitchens:
-        grid.place_object(x, y, "kitchens")
+        grid.place_object(x, y, "kitchen")
 
     drawn_grid = draw_grid(grid)
 

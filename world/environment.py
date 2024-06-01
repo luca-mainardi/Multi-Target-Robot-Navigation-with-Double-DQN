@@ -16,6 +16,7 @@ try:
     from world.grid import Grid
     from world.gui import GUI
     from world.path_visualizer import visualize_path
+
 except ModuleNotFoundError:
     from os import path
     from os import pardir
@@ -58,6 +59,8 @@ class Environment:
                 calculated as 1-sigma.
             agent_start_pos: Tuple where each agent should start.
                 If None is provided, then a random start position is used.
+            agent_max_capacity: Int value that indicates the maximum number of foods the agent can carry.
+            agent_storage_level: int value that indicates the current number of food the agent is carrying.
             reward_fn: Custom reward function to use. 
             target_fps: How fast the simulation should run if it is being shown
                 in a GUI. If in no_gui mode, then the simulation will run as fast as
@@ -76,9 +79,12 @@ class Environment:
 
         # Initialize other variables
         self.agent_start_pos = agent_start_pos
+        self.agent_max_capacity = 3
+        self.agent_storage_level = 0
         self.terminal_state = False
         self.sigma = sigma
-              
+        self.kitchen_cells = []
+        self.customers = []
         # Set up reward function
         if reward_fn is None:
             warn("No reward function provided. Using default reward.")
@@ -93,6 +99,7 @@ class Environment:
         else:
             self.target_spf = 1. / target_fps
         self.gui = None
+
 
     def _reset_info(self) -> dict:
         """Resets the info dictionary.
@@ -196,30 +203,25 @@ class Environment:
             new_pos: The new position of the agent.
         """
 
-        match self.grid[new_pos]:
-            case 0:  # Moved to an empty tile
-                self.agent_pos = new_pos
-                self.info["agent_moved"] = True
-                self.world_stats["total_agent_moves"] += 1
-            case 1 | 2:  # Moved to a wall or obstacle
-                self.world_stats["total_failed_moves"] += 1
-                self.info["agent_moved"] = False
-                pass
-            case 3:  # Moved to a target tile
-                self.agent_pos = new_pos
+        cell_value = self.grid[new_pos]
+        if cell_value in [0, 3, 5]:
+            self.agent_pos = new_pos
+            self.info["agent_moved"] = True
+            self.world_stats["total_agent_moves"] += 1
+
+            if cell_value == 3:  # Target Tile
                 self.grid[new_pos] = 0
-                if np.sum(self.grid == 3) == 0:
-                    self.terminal_state = True
+                self.terminal_state = np.sum(self.grid == 3) == 0
                 self.info["target_reached"] = True
                 self.world_stats["total_targets_reached"] += 1
-                self.info["agent_moved"] = True
-                self.world_stats["total_agent_moves"] += 1
-                # Otherwise, the agent can't move and nothing happens
-            case _:
-                raise ValueError(f"Grid is badly formed. It has a value of "
-                                 f"{self.grid[new_pos]} at position "
-                                 f"{new_pos}.")
-        
+
+            elif cell_value == 5:  # Kitchen Tile
+                self.agent_storage_level = self.agent_max_capacity
+        elif cell_value in [1, 2, 6]:  # Wall, obstacle or table
+            self.world_stats["total_failed_moves"] += 1
+            self.info["agent_moved"] = False
+        else:
+            raise ValueError(f"Grid is badly formed. It has a value of {self.grid[new_pos]} at position {new_pos}.")
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool]:
         """This function makes the agent take a step on the grid.
@@ -229,6 +231,8 @@ class Environment:
             - 1: Move up
             - 2: Move left
             - 3: Move right
+            - 4: Deliver
+            - 5: Pick-up food
         Args:
             action: Integer representing the action the agent should
                 take. 
@@ -262,16 +266,41 @@ class Environment:
         if val > self.sigma:
             actual_action = action
         else:
-            actual_action = random.randint(0, 3)
+            actual_action = random.randint(0, 5)
         
         # Make the move
         self.info["actual_action"] = actual_action
-        direction = action_to_direction(actual_action)    
-        new_pos = (self.agent_pos[0] + direction[0], self.agent_pos[1] + direction[1])
-        self._move_agent(new_pos)
 
-        # Calculate the reward for the agent
-        reward = self.reward_fn(self.grid, new_pos)
+        reward = 0
+        if actual_action <= 3:
+            direction = action_to_direction(actual_action)
+            new_pos = (self.agent_pos[0] + direction[0], self.agent_pos[1] + direction[1])
+            self._move_agent(new_pos)
+
+            # Calculate the reward for the agent
+            reward = self.reward_fn(self.grid, new_pos)
+
+        elif actual_action == 4:  # delivery
+            self.agent_storage_level -= 1
+            delivery_pickup_case = 1
+            self.world_stats["total_failed_moves"] += 1
+
+            for customer in self.customers:
+                if self.calc_manhattan_distance(customer, self.agent_pos) < 2:
+                    self.world_stats["total_failed_moves"] -= 1
+                    delivery_pickup_case = 0
+                    self.customers.remove(customer)
+                    break
+
+            reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
+
+        elif actual_action == 5:  # pickup
+            if self.grid[self.agent_pos] != 5:
+                delivery_pickup_case = 2
+            else:
+                delivery_pickup_case = 3
+            reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
+
         self.world_stats["cumulative_reward"] += reward
 
         # GUI specific code
@@ -284,8 +313,12 @@ class Environment:
 
         return self.agent_pos, reward, self.terminal_state, self.info
 
+
+    def calc_manhattan_distance(self, pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
     @staticmethod
-    def _default_reward_function(grid, agent_pos) -> float:
+    def _default_reward_function(grid, agent_pos, delivery_pickup_case=None) -> float:
         """This is a very simple reward function. Feel free to adjust it.
         Any custom reward function must also follow the same signature, meaning
         it must be written like `reward_name(grid, temp_agent_pos)`.
@@ -300,18 +333,30 @@ class Environment:
             action.
         """
 
-        match grid[agent_pos]:
-            case 0:  # Moved to an empty tile
-                reward = -1
-            case 1 | 2:  # Moved to a wall or obstacle
-                reward = -5
-                pass
-            case 3:  # Moved to a target tile
-                reward = 10
-                # "Illegal move"
-            case _:
-                raise ValueError(f"Grid cell should not have value: {grid[agent_pos]}.",
-                                 f"at position {agent_pos}")
+        if delivery_pickup_case:
+            match delivery_pickup_case:
+                case 0:    # Successful delivery
+                    reward = 10
+                case 1:    # Unsuccessful delivery
+                    reward = -4
+                case 2:    # Unsuccessful pickup
+                    reward = -2
+                case 3:
+                    reward = 0
+        else:
+            match grid[agent_pos]:
+                case 0:  # Moved to an empty tile
+                    reward = -1
+                case 1 | 2 | 6:  # Moved to a wall or obstacle
+                    reward = -5
+                    pass
+                case 3:  # Moved to a target tile
+                    reward = 10
+                    # "Illegal move"
+                case _:
+                    raise ValueError(f"Grid cell should not have value: {grid[agent_pos]}.",
+                                     f"at position {agent_pos}")
+
         return reward
 
     @staticmethod

@@ -51,7 +51,8 @@ def draw_grid(grid):
         'grid.html',
         height=30, width=30,
         n_rows=grid.n_rows, n_cols=grid.n_cols,
-        room_config=grid.cells, materials=materials
+        room_config=grid.cells, materials=materials,
+        
     )}
 
 

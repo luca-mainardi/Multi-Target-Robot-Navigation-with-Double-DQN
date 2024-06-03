@@ -85,6 +85,8 @@ class Environment:
         self.sigma = sigma
         self.kitchen_cells = []
         self.customers = []
+        self.n_actions = 3
+
         # Set up reward function
         if reward_fn is None:
             warn("No reward function provided. Using default reward.")
@@ -273,7 +275,7 @@ class Environment:
         if val > self.sigma:
             actual_action = action
         else:
-            actual_action = random.randint(0, 5)
+            actual_action = random.randint(0, 3)
         
         # Make the move
         self.info["actual_action"] = actual_action
@@ -282,10 +284,11 @@ class Environment:
         if actual_action <= 3:
             direction = action_to_direction(actual_action)
             new_pos = (self.agent_pos[0] + direction[0], self.agent_pos[1] + direction[1])
-            self._move_agent(new_pos)
+         
 
             # Calculate the reward for the agent
             reward = self.reward_fn(self.grid, new_pos)
+            self._move_agent(new_pos)
 
         elif actual_action == 4:  # delivery
             self.agent_storage_level = max(0, self.agent_storage_level - 1)
@@ -327,7 +330,7 @@ class Environment:
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
     @staticmethod
-    def _default_reward_function(grid, agent_pos, delivery_pickup_case=None) -> float:
+    def _default_reward_function(grid, agent_pos, delivery_pickup_case=False) -> float:
         """This is a very simple reward function. Feel free to adjust it.
         Any custom reward function must also follow the same signature, meaning
         it must be written like `reward_name(grid, temp_agent_pos)`.
@@ -355,10 +358,9 @@ class Environment:
         else:
             match grid[agent_pos]:
                 case 0 | 5:  # Moved to an empty or kitchen tile
-                    reward = -1
+                    reward = -0.1
                 case 1 | 2 | 6:  # Moved to a wall or obstacle
-                    reward = -5
-                    pass
+                    reward = -1
                 case 3:  # Moved to a target tile
                     reward = 10
                     # "Illegal move"
@@ -413,7 +415,7 @@ class Environment:
 
         for _ in trange(max_steps, desc="Evaluating agent"):
             
-            action = agent.take_action(state)
+            action = agent.take_action(state, evaluation=True)
             state, _, terminated, _ = env.step(action)
 
             agent_path.append(state)

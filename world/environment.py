@@ -239,7 +239,7 @@ class Environment:
         else:
             raise ValueError(f"Grid is badly formed. It has a value of {self.grid[new_pos]} at position {new_pos}.")
 
-    def step(self, action: int, agent_visit_list: list) -> tuple[np.ndarray, float, bool]:
+    def step(self, action: int, agent_current_visit_list: list) -> tuple[np.ndarray, float, bool]:
         """This function makes the agent take a step on the grid.
 
         Action is provided as integer and values are:
@@ -275,7 +275,8 @@ class Environment:
                 paused_info = self._reset_info()
                 paused_info["agent_moved"] = True
                 self.gui.render(self.grid, self.agent_pos, paused_info,
-                                0, self.agent_storage_level, is_single_step)
+                                0, self.agent_storage_level,
+                                agent_current_visit_list, is_single_step)
 
         # Add stochasticity into the agent action
         val = random.random()
@@ -302,7 +303,7 @@ class Environment:
         self.logger.log("Table or kitchen number ", table_or_kitchen_number)
 
         # Calculate the reward for the agent
-        reward = self.reward_fn(new_pos, agent_visit_list) 
+        reward = self.reward_fn(new_pos, agent_current_visit_list) 
         self.logger.log("Reward ", reward)
         self._move_agent(new_pos)
 
@@ -337,7 +338,8 @@ class Environment:
             if time_to_wait > 0:
                 sleep(time_to_wait)
             self.gui.render(self.grid, self.agent_pos, self.info,
-                            reward, self.agent_storage_level, is_single_step)
+                            reward, self.agent_storage_level,
+                            agent_current_visit_list, is_single_step)
 
         return self.agent_pos, reward, self.terminal_state, self.info, table_or_kitchen_number
 
@@ -362,7 +364,7 @@ class Environment:
                 if visit_list == [0]:
                     reward = 1 # visited when kitchen was the goal 
                 else:
-                    reward = 0 # visited when kitchen was not the goal 
+                    reward = -0.1 # visited when kitchen was not the goal 
             case 6: # table 
                 table_number = self.table_number_mapping[agent_pos] 
                 if table_number in visit_list:

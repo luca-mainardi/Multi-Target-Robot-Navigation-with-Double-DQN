@@ -10,7 +10,10 @@ class Logger():
             print(message, variable)
 
 def find_blocks(table_cells):
-
+    """
+    Function to group tables together 
+    based on their position.
+    """
     def get_neighbors(cell):
         x, y = cell
         return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
@@ -47,7 +50,7 @@ def encode_input(env, position, visit_list=None):
     Args:
         env: The environment object containing the agent's position and target positions.
         position: The agent's current position as a tuple (position).
-
+        visit_list: The agent's current list of tables to visit 
     Returns:
         np.ndarray: The generated input feature vector.
     """

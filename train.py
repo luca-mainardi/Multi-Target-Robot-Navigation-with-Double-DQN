@@ -62,6 +62,7 @@ def get_device():
     
     return device
 
+# Set to true for debug prints
 logger = Logger(print_on=False)
 
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
@@ -97,7 +98,7 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
 
                 for _ in range(max_steps_per_ep):
                     logger.log("\n")
-                    logger.log("master list ", agent.episode_visit_list)
+                    logger.log("full episode list ", agent.episode_visit_list)
                     logger.log("current list ", agent.current_visit_list)
                     # Agent takes an action based on the latest observation and info.
                     action = agent.take_action(state)
@@ -114,6 +115,7 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                         loss = agent.update(state, info["actual_action"], next_state, reward, ep, table_or_kitchen_number)
                         if loss is not None:
                             losses.append(loss.item())
+
                     # Train agent 
                     loss = agent.update(state, info["actual_action"], next_state, reward, ep, table_or_kitchen_number)
                     if loss is not None:

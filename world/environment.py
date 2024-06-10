@@ -371,7 +371,7 @@ class Environment:
                     count = visit_list.count(table_number) # number of times table appears in visit list
                     reward = count * 10 # correct table
                 else: 
-                    reward = -0.1 # wrong table 
+                    reward = -10 # wrong table 
             case _: # illegal 
                 raise ValueError(f"Grid cell should not have value: {self.grid[agent_pos]}.",
                     f"at position {agent_pos}")

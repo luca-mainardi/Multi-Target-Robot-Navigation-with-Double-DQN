@@ -9,7 +9,8 @@ from torch.utils.tensorboard import SummaryWriter
 import torch
 import math
 from agents.double_dqn_agent import DoubleDQNAgent
-from model_input_data import generate_input
+from utils import *
+
 try:
     from world import Environment
 except ModuleNotFoundError:
@@ -43,7 +44,7 @@ def parse_args():
                    help="Type of agent to use." )
     p.add_argument("--load_model", type=Path, default=None,
                    help="Path to a pre-trained model to load.")
-    p.add_argument("--trainable", type=bool, default=True,
+    p.add_argument("--trainable", type=bool, default=False,
                    help="If set, the loaded model will be trainable.")
     return p.parse_args()
 
@@ -61,37 +62,7 @@ def get_device():
     
     return device
 
-
-
-def reward_fn(grid, agent_pos) -> float:
-    """This is a very simple reward function. Feel free to adjust it.
-    Any custom reward function must also follow the same signature, meaning
-    it must be written like `reward_name(grid, temp_agent_pos)`.
-
-    Args:
-        grid: The grid the agent is moving on, in case that is needed by
-            the reward function.
-        agent_pos: The position the agent is moving to.
-
-    Returns:
-        A single floating point value representing the reward for a given
-        action.
-    """
-
-    match grid[agent_pos]:
-        case 0 | 5:  # Moved to an empty or kitchen tile
-            reward = -0.1
-        case 1 | 2 | 6:  # Moved to a wall or obstacle
-            reward = -1
-        case 3:  # Moved to a target tile
-            reward = 20
-            # "Illegal move"
-        case _:
-            raise ValueError(f"Grid cell should not have value: {grid[agent_pos]}.",
-                             f"at position {agent_pos}")
-
-    return reward
-
+logger = Logger(print_on=False)
 
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
          sigma: float, random_seed: int, agent_type: str, load_model: Path, trainable: bool):
@@ -102,14 +73,15 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         
         # Set up the environment
         env = Environment(grid, no_gui, sigma=sigma, target_fps=fps,
-                          random_seed=random_seed, reward_fn=reward_fn)
+                          random_seed=random_seed, logger=logger)
+        
         model_filename = f"{grid.stem}_iters_{iters}.pth"
 
         if agent_type == "ddqn":
             # Maximum possible steps per episode 
-            max_steps_per_ep = 80
+            max_steps_per_ep = 500
             # Defines at which training step to reach minimum epsilon
-            decay_steps = max_steps_per_ep * iters * 0.3
+            decay_steps = max_steps_per_ep * iters * 0.4
             # Initialize agent 
             agent = DoubleDQNAgent(env, start_epsilon=0.99, end_epsilon=0.01, decay_steps=decay_steps, gamma=0.90, device=get_device())
             if load_model:
@@ -117,26 +89,33 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
 
             for ep in trange(iters):
                 # Always reset the environment to initial state
-                state = env.reset()
+                state, tables_to_visit = env.reset()
+                agent.inject_episode_table_list(tables_to_visit)
                 total_reward = 0
                 losses = []
                 q_values = []
+
                 for _ in range(max_steps_per_ep):
+                    logger.log("\n")
+                    logger.log("master list ", agent.episode_visit_list)
+                    logger.log("current list ", agent.current_visit_list)
                     # Agent takes an action based on the latest observation and info.
                     action = agent.take_action(state)
-                    # The action is performed in the environment
-                    next_state, reward, terminated, info = env.step(action)
 
+                    # The action is performed in the environment, reward depends on the agent's current visit list 
+                    next_state, reward, terminated, info, table_or_kitchen_number = env.step(action, agent.current_visit_list)
                     # Increment total reward for current episode
                     total_reward += reward
+
                     q_values.append(torch.max(agent.policy_net(
-                        torch.tensor(generate_input(env, state), device=agent.device, dtype=torch.float32))).item())
+                        torch.tensor(encode_input(env, state, agent.current_visit_list), device=agent.device, dtype=torch.float32))).item())
+                    
                     if trainable:
-                        loss = agent.update(state, info["actual_action"], next_state, reward, ep)
+                        loss = agent.update(state, info["actual_action"], next_state, reward, ep, table_or_kitchen_number)
                         if loss is not None:
                             losses.append(loss.item())
                     # Train agent 
-                    loss = agent.update(state, info["actual_action"], next_state, reward, ep)
+                    loss = agent.update(state, info["actual_action"], next_state, reward, ep, table_or_kitchen_number)
                     if loss is not None:
                         losses.append(loss.item())
 
@@ -153,7 +132,7 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                 writer.add_scalar('Epsilon', agent.end_epsilon + (agent.start_epsilon - agent.end_epsilon) * math.exp(
                     -1 * agent.steps_completed / agent.decay_steps), ep)
                 writer.add_scalar('Average Q-Value', avg_q_value, ep)
-                if ep%25==0:
+                if ep%1==0:
                     print(f'Total Reward for episode {ep}: {total_reward}')
                 if ep%100 == 0:
                     agent.save_model(model_filename)

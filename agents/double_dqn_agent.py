@@ -8,14 +8,13 @@ import torch.optim as optim
 from agents import BaseAgent
 from dqn import DQN
 from .replay_buffer import ReplayBuffer
-from model_input_data import generate_input
-
+from utils import *
 
 class DoubleDQNAgent(BaseAgent):
     """
     A reinforcement learning agent that uses a double deep Q-network. 
     """
-    def __init__(self, env, decay_steps, gamma, device, start_epsilon=0.5, end_epsilon=0.01, n_actions=4, batch_size=128):
+    def __init__(self, env, decay_steps, gamma, device, start_epsilon=0.5, end_epsilon=0.01, n_actions=4, batch_size=128, logger: Logger = None):
         super().__init__()
         self.n_actions=n_actions
         self.env = env
@@ -28,7 +27,7 @@ class DoubleDQNAgent(BaseAgent):
         self.steps_completed = 0
         self.epsilon = start_epsilon
         self.grid_size = self.env.grid.shape[1] * self.env.grid.shape[0]
-        self.input_data_size = len(generate_input(env, (0, 0)))
+        self.input_data_size = len(encode_input(env, (0, 0)))
         print("Input data size: ", self.input_data_size)
         self.policy_net = DQN(self.input_data_size, self.n_actions).to(self.device)
         self.target_net = DQN(self.input_data_size, self.n_actions).to(self.device)
@@ -36,15 +35,42 @@ class DoubleDQNAgent(BaseAgent):
         self.criterion = nn.MSELoss()
         self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=1e-2)
         self.batch_size=128
+        self.capacity = 3
+        self.episode_visit_list = [] # all tables that the agent must visit in an episode 
+        self.current_visit_list = [] # tables that the agent can store in its capacity 
+        self.logger = logger
 
-    def update(self, state:  tuple[int, int], action: int, next_state: tuple[int, int], reward: float, episode: int):
+    def inject_episode_table_list(self, table_list):
+        self.episode_visit_list = table_list[self.capacity:]
+        self.current_visit_list = table_list[0:self.capacity]
+        
+    def update_current_visit_list(self, table_or_kitchen_number):
+        if table_or_kitchen_number == 0: # visited kitchen...
+            if self.current_visit_list == [0]: # ...when kitchen was the goal: then remove the 0, refill list 
+                self.current_visit_list = self.current_visit_list = self.episode_visit_list[0:self.capacity] 
+                self.episode_visit_list = self.episode_visit_list[self.capacity:]  
+            elif len(self.current_visit_list) < self.capacity: # ...with space for more plates: then calculate space, refill list 
+                remaining_capacity = self.capacity - len(self.current_visit_list)  
+                self.current_visit_list += self.episode_visit_list[0:remaining_capacity]
+                self.episode_visit_list = self.episode_visit_list[remaining_capacity:]
+
+        if table_or_kitchen_number != 0: # visited table... 
+            if table_or_kitchen_number in self.current_visit_list: # ...when table was in list 
+                self.current_visit_list = [table for table in self.current_visit_list if table != table_or_kitchen_number] # remove table from list 
+                if len(self.current_visit_list) == 0: # if list is empty after visit, go to kitchen 
+                    self.current_visit_list = [0]
+
+    def update(self, state:  tuple[int, int], action: int, next_state: tuple[int, int], reward: float, episode: int, table_or_kitchen_number: int):
         """
         Update the DQN agent after performing an action in the environment. 
         """
-        state = generate_input(self.env, state)
-        next_state = generate_input(self.env, next_state)
-        state = torch.tensor(state, device=self.device, dtype=torch.float32)
+        state = encode_input(self.env, state, self.current_visit_list)
+        # Update visit list 
+        self.update_current_visit_list(table_or_kitchen_number)
+        next_state = encode_input(self.env, next_state, self.current_visit_list)
 
+        # Convert to tensors
+        state = torch.tensor(state, device=self.device, dtype=torch.float32)
         action = torch.tensor([action], device=self.device)
         next_state = torch.tensor(next_state, device=self.device, dtype=torch.float32)
         reward = torch.tensor([reward], device=self.device, dtype=torch.float32)
@@ -83,12 +109,14 @@ class DoubleDQNAgent(BaseAgent):
                 param.requires_grad = False
         print(f"Model loaded from {filepath}, trainable={trainable}")
 
-    def take_action(self, state: int, evaluation=False) -> int:
+    def take_action(self, state: int,  evaluation=False) -> int:
         """
         Take an action in the environment 
         following epsilon-greedy policy. 
         """
-        state = generate_input(self.env, state)
+        state = encode_input(self.env, state, self.current_visit_list)
+        # encode state and visit list here 
+
         state = torch.tensor(state, device=self.device, dtype=torch.float32)
         rand = random.random()
 

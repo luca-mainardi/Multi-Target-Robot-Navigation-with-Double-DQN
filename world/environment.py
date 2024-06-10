@@ -10,6 +10,7 @@ from warnings import warn
 from time import time, sleep
 from datetime import datetime
 from world.helpers import save_results, action_to_direction
+from utils import *
 
 try:
     from agents import BaseAgent
@@ -42,7 +43,8 @@ class Environment:
                  agent_start_pos: tuple[int, int] = None,
                  reward_fn: callable = None,
                  target_fps: int = 30,
-                 random_seed: int | float | str | bytes | bytearray | None = 0):
+                 random_seed: int | float | str | bytes | bytearray | None = 0,
+                 logger: Logger = None):
         
         """Creates the Grid Environment for the Reinforcement Learning robot
         from the provided file.
@@ -69,7 +71,7 @@ class Environment:
             random_seed: The random seed to use for this environment. If None
                 is provided, then the seed will be set to 0.
         """
-        random.seed(random_seed)
+        # random.seed(random_seed)
 
         # Initialize Grid
         if not grid_fp.exists():
@@ -84,13 +86,13 @@ class Environment:
         self.terminal_state = False
         self.sigma = sigma
         self.kitchen_cells = []
-        self.customers = []
-        self.n_actions = 3
+        self.table_cells = []
+        self.logger = logger
 
         # Set up reward function
         if reward_fn is None:
             warn("No reward function provided. Using default reward.")
-            self.reward_fn = self._default_reward_function
+            self.reward_fn = self._default_reward_fn
         else:
             self.reward_fn = reward_fn
 
@@ -106,9 +108,13 @@ class Environment:
         for row in range(self.grid.shape[0]):
             for col in range(self.grid.shape[1]):
                 if self.grid[row, col] == 6:  # 6 represents a table cell
-                    self.customers.append((row, col))
-                if self.grid[row, col] == 5:
+                    self.table_cells.append((row, col))
+                if self.grid[row, col] == 5: # 5 represents a kitchen cell
                     self.kitchen_cells.append((row, col))
+
+        # Find the blocks
+        self.table_number_mapping, self.n_tables = find_blocks(self.table_cells)
+        print(self.table_number_mapping)
 
     def _reset_info(self) -> dict:
         """Resets the info dictionary.
@@ -159,7 +165,6 @@ class Environment:
             idx = random.randint(0, len(zeros[0]) - 1)
             self.agent_pos = (zeros[0][idx], zeros[1][idx])
 
-
     def reset(self, **kwargs) -> tuple[int, int]:
         """Reset the environment to an initial state.
 
@@ -193,6 +198,8 @@ class Environment:
         self.terminal_state = False
         self.info = self._reset_info()
         self.world_stats = self._reset_world_stats()
+        self.table_visit_list = [random.randint(1, self.n_tables) for _ in range(9)]
+        self.logger.log("Table visit list: ", self.table_visit_list)
 
         # GUI specific code
         if not self.no_gui:
@@ -202,7 +209,7 @@ class Environment:
             if self.gui is not None:
                 self.gui.close()
 
-        return self.agent_pos
+        return self.agent_pos, self.table_visit_list
 
     def _move_agent(self, new_pos: tuple[int, int]):
         """Moves the agent, if possible and updates the 
@@ -232,7 +239,7 @@ class Environment:
         else:
             raise ValueError(f"Grid is badly formed. It has a value of {self.grid[new_pos]} at position {new_pos}.")
 
-    def step(self, action: int) -> tuple[np.ndarray, float, bool]:
+    def step(self, action: int, agent_visit_list: list) -> tuple[np.ndarray, float, bool]:
         """This function makes the agent take a step on the grid.
 
         Action is provided as integer and values are:
@@ -281,37 +288,46 @@ class Environment:
         self.info["actual_action"] = actual_action
 
         reward = 0
-        if actual_action <= 3:
+        if actual_action <= 3: # up, down, left, right
             direction = action_to_direction(actual_action)
             new_pos = (self.agent_pos[0] + direction[0], self.agent_pos[1] + direction[1])
-         
+        self.logger.log("Actual action ", actual_action)
+        # Get table number or 0 if new_pos is kitchen 
+        if new_pos in self.kitchen_cells:
+            table_or_kitchen_number = 0 # represents kitchen 
+        elif new_pos in self.table_cells:
+            table_or_kitchen_number = self.table_number_mapping[new_pos] # table number
+        else:
+            table_or_kitchen_number = None
+        self.logger.log("Table or kitchen number ", table_or_kitchen_number)
 
-            # Calculate the reward for the agent
-            reward = self.reward_fn(self.grid, new_pos)
-            self._move_agent(new_pos)
+        # Calculate the reward for the agent
+        reward = self.reward_fn(new_pos, agent_visit_list) 
+        self.logger.log("Reward ", reward)
+        self._move_agent(new_pos)
 
-        elif actual_action == 4:  # delivery
-            self.agent_storage_level = max(0, self.agent_storage_level - 1)
-            delivery_pickup_case = 2
-            self.world_stats["total_failed_moves"] += 1
+        # elif actual_action == 4:  # delivery
+        #     self.agent_storage_level = max(0, self.agent_storage_level - 1)
+        #     delivery_pickup_case = 2
+        #     self.world_stats["total_failed_moves"] += 1
 
-            for customer in self.customers:
-                if self.calc_manhattan_distance(customer, self.agent_pos) < 2:
-                    self.world_stats["total_failed_moves"] -= 1
-                    delivery_pickup_case = 1
-                    self.customers.remove(customer)
-                    break
+        #     for customer in self.customers:
+        #         if self.calc_manhattan_distance(customer, self.agent_pos) < 2:
+        #             self.world_stats["total_failed_moves"] -= 1
+        #             delivery_pickup_case = 1
+        #             self.customers.remove(customer)
+        #             break
 
-            reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
-            if reward == 50:
-                print("HERE")
+        #     reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
+        #     if reward == 50:
+        #         print("HERE")
 
-        elif actual_action == 5:  # pickup
-            if self.grid[self.agent_pos] != 5:
-                delivery_pickup_case = 3
-            else:
-                delivery_pickup_case = 4
-            reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
+        # elif actual_action == 5:  # pickup
+        #     if self.grid[self.agent_pos] != 5:
+        #         delivery_pickup_case = 3
+        #     else:
+        #         delivery_pickup_case = 4
+        #     reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
 
         self.world_stats["cumulative_reward"] += reward
 
@@ -323,18 +339,11 @@ class Environment:
             self.gui.render(self.grid, self.agent_pos, self.info,
                             reward, self.agent_storage_level, is_single_step)
 
-        return self.agent_pos, reward, self.terminal_state, self.info
+        return self.agent_pos, reward, self.terminal_state, self.info, table_or_kitchen_number
 
 
-    def calc_manhattan_distance(self, pos1, pos2):
-        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
-
-    @staticmethod
-    def _default_reward_function(grid, agent_pos, delivery_pickup_case=False) -> float:
-        """This is a very simple reward function. Feel free to adjust it.
-        Any custom reward function must also follow the same signature, meaning
-        it must be written like `reward_name(grid, temp_agent_pos)`.
-
+    def _default_reward_fn(self, agent_pos, visit_list) -> float:
+        """
         Args:
             grid: The grid the agent is moving on, in case that is needed by
                 the reward function.
@@ -344,31 +353,32 @@ class Environment:
             A single floating point value representing the reward for a given
             action.
         """
-
-        if delivery_pickup_case:
-            match delivery_pickup_case:
-                case 1:    # Successful delivery
-                    reward = 50
-                case 2:    # Unsuccessful delivery
-                    reward = -4
-                case 3:    # Unsuccessful pickup
-                    reward = -2
-                case 4:
-                    reward = 0
-        else:
-            match grid[agent_pos]:
-                case 0 | 5:  # Moved to an empty or kitchen tile
-                    reward = -0.1
-                case 1 | 2 | 6:  # Moved to a wall or obstacle
-                    reward = -1
-                case 3:  # Moved to a target tile
-                    reward = 10
-                    # "Illegal move"
-                case _:
-                    raise ValueError(f"Grid cell should not have value: {grid[agent_pos]}.",
-                                     f"at position {agent_pos}")
+        match self.grid[agent_pos]:
+            case 0: # empty tile
+                reward = -0.1
+            case 1 | 2: # wall or obstacle 
+                reward = -1 
+            case 5: # kitchen
+                if visit_list == [0]:
+                    reward = 1 # visited when kitchen was the goal 
+                else:
+                    reward = 0 # visited when kitchen was not the goal 
+            case 6: # table 
+                table_number = self.table_number_mapping[agent_pos] 
+                if table_number in visit_list:
+                    count = visit_list.count(table_number) # number of times table appears in visit list
+                    reward = count * 10 # correct table
+                else: 
+                    reward = -0.1 # wrong table 
+            case _: # illegal 
+                raise ValueError(f"Grid cell should not have value: {self.grid[agent_pos]}.",
+                    f"at position {agent_pos}")
 
         return reward
+
+    def calc_manhattan_distance(self, pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+    
 
     @staticmethod
     def evaluate_agent(grid_fp: Path,

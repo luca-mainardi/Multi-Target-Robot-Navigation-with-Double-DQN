@@ -25,6 +25,7 @@ class GUI:
         ("total_steps", "Total steps:"),
         ("total_failed_move", "Total failed moves:"),
         ("agent_storage_level", "Agent Storage Level:"),
+        ("current_visit_list", "Current targets"),
 
         # ("total_targets_reached", "Total targets reached:"),
         ("fps", "FPS:"),
@@ -86,7 +87,8 @@ class GUI:
                 "fps": "0.0",
                 "total_steps": 0,
                 "cumulative_reward": 0,
-                "agent_storage_level": 0}
+                "agent_storage_level": 0,
+                "current_visit_list": []}
 
     def _initial_render(self):
         """Initial render of the environment. Also shows loading text."""
@@ -214,7 +216,8 @@ class GUI:
 
 
     def render(self, grid_cells: np.ndarray, agent_pos: tuple[int, int],
-               info: dict[str, any], reward: int, agent_storage_level: int, is_single_step: bool = False):
+               info: dict[str, any], reward: int, episode_visit_list: list, 
+               current_visit_list: list, is_single_step: bool = False):
         """Render the environment.
 
         Args:
@@ -242,7 +245,8 @@ class GUI:
         self.stats["total_failed_move"] += failed_move
 
         self.stats["cumulative_reward"] += reward
-        self.stats["agent_storage_level"] = agent_storage_level  # Update storage level
+        self.stats["episode_visit_list"] = episode_visit_list 
+        self.stats["current_visit_list"] = current_visit_list 
 
         # Create a surface to actually draw on
         background = pygame.Surface(self.window.get_size()).convert()

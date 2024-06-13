@@ -14,7 +14,7 @@ class DoubleDQNAgent(BaseAgent):
     """
     A reinforcement learning agent that uses a double deep Q-network. 
     """
-    def __init__(self, env, decay_steps, gamma, device, start_epsilon=0.5, end_epsilon=0.01, n_actions=4, batch_size=128, logger: Logger = None):
+    def __init__(self, env, decay_steps, gamma, device, start_epsilon=0.5, end_epsilon=0.01, n_actions=4, capacity = 3, batch_size=128, logger: Logger = None):
         super().__init__()
         self.n_actions=n_actions
         self.env = env
@@ -35,15 +35,20 @@ class DoubleDQNAgent(BaseAgent):
         self.criterion = nn.MSELoss()
         self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=1e-2)
         self.batch_size=128
-        self.capacity = 3
+        self.capacity = capacity
         self.episode_visit_list = [] # all tables that the agent must visit in an episode 
         self.current_visit_list = [] # tables that the agent can store in its capacity 
         self.logger = logger
+        self.wrong_table_visits = 0
+        self.visits_to_kitchen = 0
 
     def visited_all_tables(self):
         return len(self.episode_visit_list) == 0
     
     def inject_episode_table_list(self, table_list):
+        self.wrong_table_visits = 0 # reset wrong table visit counter every episode
+        self.visits_to_kitchen = 0 # reset kitchen visit counter every episode
+
         self.episode_visit_list = table_list[self.capacity:]
         self.current_visit_list = table_list[0:self.capacity]
         
@@ -52,16 +57,21 @@ class DoubleDQNAgent(BaseAgent):
             if self.current_visit_list == [0]: # ...when kitchen was the goal: then remove the 0, refill list 
                 self.current_visit_list = self.current_visit_list = self.episode_visit_list[0:self.capacity] 
                 self.episode_visit_list = self.episode_visit_list[self.capacity:]  
+                self.visits_to_kitchen += 1
+
             elif len(self.current_visit_list) < self.capacity: # ...with space for more plates: then calculate space, refill list 
                 remaining_capacity = self.capacity - len(self.current_visit_list)  
                 self.current_visit_list += self.episode_visit_list[0:remaining_capacity]
                 self.episode_visit_list = self.episode_visit_list[remaining_capacity:]
+                self.visits_to_kitchen += 1
 
         if table_or_kitchen_number != 0: # visited table... 
             if table_or_kitchen_number in self.current_visit_list: # ...when table was in list 
                 self.current_visit_list = [table for table in self.current_visit_list if table != table_or_kitchen_number] # remove table from list 
                 if len(self.current_visit_list) == 0: # if list is empty after visit, go to kitchen 
                     self.current_visit_list = [0]
+            elif table_or_kitchen_number is not None: # visited a wrong table 
+                self.wrong_table_visits += 1
 
     def update(self, state:  tuple[int, int], action: int, next_state: tuple[int, int], reward: float, episode: int, table_or_kitchen_number: int):
         """

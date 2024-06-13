@@ -104,7 +104,7 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                     action = agent.take_action(state)
 
                     # The action is performed in the environment, reward depends on the agent's current visit list 
-                    next_state, reward, terminated, info, table_or_kitchen_number = env.step(action, agent.current_visit_list)
+                    next_state, reward, info, table_or_kitchen_number = env.step(action, agent.current_visit_list)
                     # Increment total reward for current episode
                     total_reward += reward
 
@@ -123,8 +123,8 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
 
                     state = next_state
 
-                    # If the final state is reached, stop.
-                    if terminated:
+                    # If agent has visited all the tables it had to visit, episode is over 
+                    if agent.visited_all_tables():
                         break
                 avg_loss = sum(losses) / len(losses) if losses else 0
                 avg_q_value = sum(q_values) / len(q_values) if q_values else 0

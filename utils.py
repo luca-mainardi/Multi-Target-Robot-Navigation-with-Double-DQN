@@ -32,7 +32,7 @@ def find_blocks(table_cells):
     cell_set = set(table_cells)
     visited = set()
     blocks = defaultdict(list)
-    block_id = 0
+    block_id = 1 # ensure that tables are numbered starting from 1, since 0 represents the kitchen
 
     for cell in table_cells:
         if cell not in visited:
@@ -41,7 +41,7 @@ def find_blocks(table_cells):
     
     block_numbers = {cell: block_id for block_id, block_cells in blocks.items() for cell in block_cells}
 
-    return block_numbers, block_id
+    return block_numbers, block_id-1
 
 def encode_input(env, position, visit_list=None):
     """
@@ -67,7 +67,10 @@ def encode_input(env, position, visit_list=None):
     if visit_list:
         for value in visit_list:
             visit_list_channel[value] += 1 
+    
+    # Calculate the number of dishes 
+    n_dishes = [np.sum(visit_list_channel)] 
 
     # Combine agent position and visit list to form state
-    state_tensor = np.concatenate((agent_channel, visit_list_channel), axis=0)
+    state_tensor = np.concatenate((agent_channel, visit_list_channel, n_dishes), axis=0)
     return state_tensor

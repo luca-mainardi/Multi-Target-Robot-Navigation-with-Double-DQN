@@ -40,6 +40,9 @@ class DoubleDQNAgent(BaseAgent):
         self.current_visit_list = [] # tables that the agent can store in its capacity 
         self.logger = logger
 
+    def visited_all_tables(self):
+        return len(self.episode_visit_list) == 0
+    
     def inject_episode_table_list(self, table_list):
         self.episode_visit_list = table_list[self.capacity:]
         self.current_visit_list = table_list[0:self.capacity]

@@ -83,7 +83,6 @@ class Environment:
         self.agent_start_pos = agent_start_pos
         self.agent_max_capacity = 3
         self.agent_storage_level = 0
-        self.terminal_state = False
         self.sigma = sigma
         self.kitchen_cells = []
         self.table_cells = []
@@ -195,7 +194,6 @@ class Environment:
         # Reset variables
         self.grid = Grid.load_grid(self.grid_fp).cells
         self._initialize_agent_pos()
-        self.terminal_state = False
         self.info = self._reset_info()
         self.world_stats = self._reset_world_stats()
         self.table_visit_list = [random.randint(1, self.n_tables) for _ in range(9)]
@@ -227,7 +225,6 @@ class Environment:
 
             if cell_value == 3:  # Target Tile
                 self.grid[new_pos] = 0
-                self.terminal_state = np.sum(self.grid == 3) == 0
                 self.info["target_reached"] = True
                 self.world_stats["total_targets_reached"] += 1
 
@@ -341,7 +338,7 @@ class Environment:
                             reward, self.agent_storage_level,
                             agent_current_visit_list, is_single_step)
 
-        return self.agent_pos, reward, self.terminal_state, self.info, table_or_kitchen_number
+        return self.agent_pos, reward, self.info, table_or_kitchen_number
 
 
     def _default_reward_fn(self, agent_pos, visit_list) -> float:

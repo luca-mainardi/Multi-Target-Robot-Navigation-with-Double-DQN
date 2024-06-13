@@ -44,7 +44,8 @@ class Environment:
                  reward_fn: callable = None,
                  target_fps: int = 30,
                  random_seed: int | float | str | bytes | bytearray | None = 0,
-                 logger: Logger = None):
+                 logger: Logger = None,
+                 n_plates : int = 10):
         
         """Creates the Grid Environment for the Reinforcement Learning robot
         from the provided file.
@@ -87,6 +88,7 @@ class Environment:
         self.kitchen_cells = []
         self.table_cells = []
         self.logger = logger
+        self.n_plates = n_plates # total number of plates per episode 
 
         # Set up reward function
         if reward_fn is None:
@@ -113,7 +115,6 @@ class Environment:
 
         # Find the blocks
         self.table_number_mapping, self.n_tables = find_blocks(self.table_cells)
-        print(self.table_number_mapping)
 
     def _reset_info(self) -> dict:
         """Resets the info dictionary.
@@ -196,8 +197,8 @@ class Environment:
         self._initialize_agent_pos()
         self.info = self._reset_info()
         self.world_stats = self._reset_world_stats()
-        self.table_visit_list = [random.randint(1, self.n_tables) for _ in range(9)]
-        self.logger.log("Table visit list: ", self.table_visit_list)
+        self.table_visit_list = [random.randint(1, self.n_tables) for _ in range(self.n_plates)]
+        print("Table visit list: ", self.table_visit_list)
 
         # GUI specific code
         if not self.no_gui:

@@ -46,6 +46,10 @@ def parse_args():
                    help="Path to a pre-trained model to load.")
     p.add_argument("--trainable", type=bool, default=False,
                    help="If set, the loaded model will be trainable.")
+    p.add_argument("--n_plates", type=int, default=10,
+                help="Total number of plates to deliver per episode.")
+    p.add_argument("--capacity", type=int, default=3,
+            help="Number of plates an agent can carry at a time.")
     return p.parse_args()
 
 
@@ -66,7 +70,8 @@ def get_device():
 logger = Logger(print_on=False)
 
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
-         sigma: float, random_seed: int, agent_type: str, load_model: Path, trainable: bool):
+         sigma: float, random_seed: int, agent_type: str, load_model: Path, 
+         trainable: bool, n_plates: int, capacity: int):
     """Main loop of the program."""
     writer = SummaryWriter()
 
@@ -74,21 +79,22 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         
         # Set up the environment
         env = Environment(grid, no_gui, sigma=sigma, target_fps=fps,
-                          random_seed=random_seed, logger=logger)
+                          random_seed=random_seed, logger=logger, n_plates=n_plates)
         
         model_filename = f"{grid.stem}_iters_{iters}.pth"
 
         if agent_type == "ddqn":
             # Maximum possible steps per episode 
-            max_steps_per_ep = 500
+            max_steps_per_ep = env.n_plates * 50
             # Defines at which training step to reach minimum epsilon
             decay_steps = max_steps_per_ep * iters * 0.4
             # Initialize agent 
-            agent = DoubleDQNAgent(env, start_epsilon=0.99, end_epsilon=0.01, decay_steps=decay_steps, gamma=0.90, device=get_device())
+            agent = DoubleDQNAgent(env, start_epsilon=0.99, end_epsilon=0.01, decay_steps=decay_steps, gamma=0.90, capacity = capacity, device=get_device())
             if load_model:
                 agent.load_model(load_model, trainable)
 
-            for ep in trange(iters):
+            for ep in range(iters):
+                print(f"\nEpisode {ep}")
                 # Always reset the environment to initial state
                 state, tables_to_visit = env.reset()
                 agent.inject_episode_table_list(tables_to_visit)
@@ -96,7 +102,7 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                 losses = []
                 q_values = []
 
-                for _ in range(max_steps_per_ep):
+                for step in range(max_steps_per_ep):
                     logger.log("\n")
                     logger.log("full episode list ", agent.episode_visit_list)
                     logger.log("current list ", agent.current_visit_list)
@@ -126,6 +132,11 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                     # If agent has visited all the tables it had to visit, episode is over 
                     if agent.visited_all_tables():
                         break
+                print(f"steps for episode {ep}:, {step}")
+                print(f"number of wrong table visits: {agent.wrong_table_visits}")
+                print(f"percentage of plates delivered: {(1-(len(agent.episode_visit_list)/n_plates))*100}%")
+                print(f"number of visits to kitchen: {agent.visits_to_kitchen}")
+
                 avg_loss = sum(losses) / len(losses) if losses else 0
                 avg_q_value = sum(q_values) / len(q_values) if q_values else 0
 
@@ -147,4 +158,4 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
 if __name__ == '__main__':
     args = parse_args()
     main(args.GRID, args.no_gui, args.iter, args.fps, args.sigma, args.random_seed, args.agent_type, args.load_model,
-         args.trainable)
+         args.trainable, args.n_plates, args.capacity)

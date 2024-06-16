@@ -362,14 +362,14 @@ class Environment:
                 if visit_list == [0]:
                     reward = 1 # visited when kitchen was the goal 
                 else:
-                    reward = -0.1 # visited when kitchen was not the goal 
+                    reward = -2 # visited when kitchen was not the goal 
             case 6: # table 
                 table_number = self.table_number_mapping[agent_pos] 
                 if table_number in visit_list:
                     count = visit_list.count(table_number) # number of times table appears in visit list
                     reward = count * 10 # correct table
                 else: 
-                    reward = -10 # wrong table 
+                    reward = -5 # wrong table 
             case _: # illegal 
                 raise ValueError(f"Grid cell should not have value: {self.grid[agent_pos]}.",
                     f"at position {agent_pos}")

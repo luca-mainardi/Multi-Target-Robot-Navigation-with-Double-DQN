@@ -31,7 +31,7 @@ def parse_args():
                         "one.")
     p.add_argument("--no_gui", action="store_true",
                    help="Disables rendering to train faster")
-    p.add_argument("--sigma", type=float, default=0.1,
+    p.add_argument("--sigma", type=float, default=0.0,
                    help="Sigma value for the stochasticity of the environment.")
     p.add_argument("--fps", type=int, default=30,
                    help="Frames per second to render at. Only used if "
@@ -79,13 +79,15 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         
         # Set up the environment
         env = Environment(grid, no_gui, sigma=sigma, target_fps=fps,
-                          random_seed=random_seed, logger=logger, n_plates=n_plates)
+                          random_seed=random_seed, logger=logger, n_plates=n_plates,
+                          agent_start_pos=(11,9))
         
         model_filename = f"{grid.stem}_iters_{iters}.pth"
 
         if agent_type == "ddqn":
             # Maximum possible steps per episode 
-            max_steps_per_ep = env.n_plates * 50
+            grid_size = env.grid.shape[0] * env.grid.shape[1] 
+            max_steps_per_ep = int(n_plates * (grid_size*0.1))
             # Defines at which training step to reach minimum epsilon
             decay_steps = max_steps_per_ep * iters * 0.4
             # Initialize agent 
@@ -132,13 +134,17 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                     # If agent has visited all the tables it had to visit, episode is over 
                     if agent.visited_all_tables():
                         break
+                    
                 print(f"steps for episode {ep}:, {step}")
                 print(f"number of wrong table visits: {agent.wrong_table_visits}")
-                print(f"percentage of plates delivered: {(1-(len(agent.episode_visit_list)/n_plates))*100}%")
+                print(f"percentage of plates delivered: {(agent.correct_table_visits/n_plates)*100}%")
                 print(f"number of visits to kitchen: {agent.visits_to_kitchen}")
 
                 avg_loss = sum(losses) / len(losses) if losses else 0
+                print(f"loss: {avg_loss}")
+
                 avg_q_value = sum(q_values) / len(q_values) if q_values else 0
+                print(f"avg q val: {avg_q_value}")
 
                 writer.add_scalar('Total Reward', total_reward, ep)
                 writer.add_scalar('Average Loss', avg_loss, ep)
@@ -149,7 +155,6 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                     print(f'Total Reward for episode {ep}: {total_reward}')
                 if ep%100 == 0:
                     agent.save_model(model_filename)
-            Environment.evaluate_agent(grid_fp=grid, agent=agent, max_steps=iters, sigma=env.sigma, random_seed=random_seed)
             agent.save_model(model_filename)
     writer.close()
 

@@ -33,7 +33,7 @@ class DoubleDQNAgent(BaseAgent):
         self.target_net = DQN(self.input_data_size, self.n_actions).to(self.device)
         self.memory = ReplayBuffer(capacity=1000)
         self.criterion = nn.MSELoss()
-        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=1e-2)
+        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=1e-3)
         self.batch_size=128
         self.capacity = capacity
         self.episode_visit_list = [] # all tables that the agent must visit in an episode 
@@ -41,16 +41,19 @@ class DoubleDQNAgent(BaseAgent):
         self.logger = logger
         self.wrong_table_visits = 0
         self.visits_to_kitchen = 0
+        self.correct_table_visits = 0
 
     def visited_all_tables(self):
-        return len(self.episode_visit_list) == 0
+        return self.correct_table_visits == self.n_tables
     
     def inject_episode_table_list(self, table_list):
         self.wrong_table_visits = 0 # reset wrong table visit counter every episode
         self.visits_to_kitchen = 0 # reset kitchen visit counter every episode
+        self.correct_table_visits = 0 # reset correct table visit counter every episode
 
-        self.episode_visit_list = table_list[self.capacity:]
-        self.current_visit_list = table_list[0:self.capacity]
+        self.episode_visit_list = table_list
+        self.n_tables = len(table_list)
+        self.current_visit_list = [0]
         
     def update_current_visit_list(self, table_or_kitchen_number):
         if table_or_kitchen_number == 0: # visited kitchen...
@@ -68,6 +71,7 @@ class DoubleDQNAgent(BaseAgent):
         if table_or_kitchen_number != 0: # visited table... 
             if table_or_kitchen_number in self.current_visit_list: # ...when table was in list 
                 self.current_visit_list = [table for table in self.current_visit_list if table != table_or_kitchen_number] # remove table from list 
+                self.correct_table_visits += 1
                 if len(self.current_visit_list) == 0: # if list is empty after visit, go to kitchen 
                     self.current_visit_list = [0]
             elif table_or_kitchen_number is not None: # visited a wrong table 
@@ -201,6 +205,6 @@ class DoubleDQNAgent(BaseAgent):
         loss.backward()
 
         # In-place gradient clipping
-        torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
+        # torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
         return loss

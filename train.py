@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch
 import math
 from agents.double_dqn_agent import DoubleDQNAgent
+from experiments import hyperparameter_search
 from utils import *
 
 try:
@@ -17,39 +18,79 @@ except ModuleNotFoundError:
     from os import path
     from os import pardir
     import sys
-    root_path = path.abspath(path.join(
-        path.join(path.abspath(__file__), pardir), pardir)
+
+    root_path = path.abspath(
+        path.join(path.join(path.abspath(__file__), pardir), pardir)
     )
     if root_path not in sys.path:
         sys.path.extend(root_path)
     from world import Environment
 
+
 def parse_args():
     p = ArgumentParser(description="DIC Reinforcement Learning Trainer.")
-    p.add_argument("GRID", type=Path, nargs="+",
-                   help="Paths to the grid file to use. There can be more than "
-                        "one.")
-    p.add_argument("--no_gui", action="store_true",
-                   help="Disables rendering to train faster")
-    p.add_argument("--sigma", type=float, default=0.0,
-                   help="Sigma value for the stochasticity of the environment.")
-    p.add_argument("--fps", type=int, default=30,
-                   help="Frames per second to render at. Only used if "
-                        "no_gui is not set.")
-    p.add_argument("--iter", type=int, default=1000,
-                   help="Number of iterations to go through.")
-    p.add_argument("--random_seed", type=int, default=0,
-                   help="Random seed value for the environment.")
-    p.add_argument("--agent_type", type=str.lower, default="ddqn",
-                   help="Type of agent to use." )
-    p.add_argument("--load_model", type=Path, default=None,
-                   help="Path to a pre-trained model to load.")
-    p.add_argument("--trainable", type=bool, default=False,
-                   help="If set, the loaded model will be trainable.")
-    p.add_argument("--n_plates", type=int, default=10,
-                help="Total number of plates to deliver per episode.")
-    p.add_argument("--capacity", type=int, default=3,
-            help="Number of plates an agent can carry at a time.")
+    p.add_argument(
+        "GRID",
+        type=Path,
+        nargs="+",
+        help="Paths to the grid file to use. There can be more than " "one.",
+    )
+    p.add_argument(
+        "--no_gui", action="store_true", help="Disables rendering to train faster"
+    )
+    p.add_argument(
+        "--sigma",
+        type=float,
+        default=0.0,
+        help="Sigma value for the stochasticity of the environment.",
+    )
+    p.add_argument(
+        "--fps",
+        type=int,
+        default=30,
+        help="Frames per second to render at. Only used if " "no_gui is not set.",
+    )
+    p.add_argument(
+        "--iter", type=int, default=1000, help="Number of iterations to go through."
+    )
+    p.add_argument(
+        "--random_seed",
+        type=int,
+        default=0,
+        help="Random seed value for the environment.",
+    )
+    p.add_argument(
+        "--agent_type", type=str.lower, default="ddqn", help="Type of agent to use."
+    )
+    p.add_argument(
+        "--load_model",
+        type=Path,
+        default=None,
+        help="Path to a pre-trained model to load.",
+    )
+    p.add_argument(
+        "--trainable",
+        type=bool,
+        default=False,
+        help="If set, the loaded model will be trainable.",
+    )
+    p.add_argument(
+        "--n_plates",
+        type=int,
+        default=10,
+        help="Total number of plates to deliver per episode.",
+    )
+    p.add_argument(
+        "--capacity",
+        type=int,
+        default=3,
+        help="Number of plates an agent can carry at a time.",
+    )
+    p.add_argument(
+        "--hyperparameter_tuning",
+        action="store_true",
+        help="If set, perform a hyperparameter tuning.",
+    )
     return p.parse_args()
 
 
@@ -63,104 +104,195 @@ def get_device():
     else:
         device = torch.device("cpu")
         print("Using CPU")
-    
+
     return device
+
 
 # Set to true for debug prints
 logger = Logger(print_on=False)
 
-def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
-         sigma: float, random_seed: int, agent_type: str, load_model: Path, 
-         trainable: bool, n_plates: int, capacity: int):
+
+def main(
+    grid_paths: list[Path],
+    no_gui: bool,
+    iters: int,
+    fps: int,
+    sigma: float,
+    random_seed: int,
+    agent_type: str,
+    load_model: Path,
+    trainable: bool,
+    n_plates: int,
+    capacity: int,
+    hyperparameter_tuning: bool = False,
+):
     """Main loop of the program."""
     writer = SummaryWriter()
 
     for grid in grid_paths:
-        
+
         # Set up the environment
-        env = Environment(grid, no_gui, sigma=sigma, target_fps=fps,
-                          random_seed=random_seed, logger=logger, n_plates=n_plates,
-                          agent_start_pos=(11,9))
-        
+        env = Environment(
+            grid,
+            no_gui,
+            sigma=sigma,
+            target_fps=fps,
+            random_seed=random_seed,
+            logger=logger,
+            n_plates=n_plates,
+            agent_start_pos=(11, 9),
+        )
+
         model_filename = f"{grid.stem}_iters_{iters}.pth"
 
         if agent_type == "ddqn":
-            # Maximum possible steps per episode 
-            grid_size = env.grid.shape[0] * env.grid.shape[1] 
-            max_steps_per_ep = int(n_plates * (grid_size*0.1))
-            # Defines at which training step to reach minimum epsilon
-            decay_steps = max_steps_per_ep * iters * 0.4
-            # Initialize agent 
-            agent = DoubleDQNAgent(env, start_epsilon=0.99, end_epsilon=0.01, decay_steps=decay_steps, gamma=0.90, capacity = capacity, device=get_device())
-            if load_model:
-                agent.load_model(load_model, trainable)
+            if hyperparameter_tuning:
+                hyperparameter_search(
+                    env,
+                    iters,
+                    device=get_device(),
+                )
+            else:  # Train the agent
+                # Maximum possible steps per episode
+                grid_size = env.grid.shape[0] * env.grid.shape[1]
+                max_steps_per_ep = int(n_plates * (grid_size * 0.1))
+                # Defines at which training step to reach minimum epsilon
+                decay_steps = max_steps_per_ep * iters * 0.4
+                # Initialize agent
+                agent = DoubleDQNAgent(
+                    env,
+                    start_epsilon=0.99,
+                    end_epsilon=0.01,
+                    decay_steps=decay_steps,
+                    gamma=0.90,
+                    capacity=capacity,
+                    device=get_device(),
+                )
+                if load_model:
+                    agent.load_model(load_model, trainable)
 
-            for ep in range(iters):
-                print(f"\nEpisode {ep}")
-                # Always reset the environment to initial state
-                state, tables_to_visit = env.reset()
-                agent.inject_episode_table_list(tables_to_visit)
-                total_reward = 0
-                losses = []
-                q_values = []
+                for ep in range(iters):
+                    print(f"\nEpisode {ep}")
+                    # Always reset the environment to initial state
+                    state, tables_to_visit = env.reset()
+                    agent.inject_episode_table_list(tables_to_visit)
+                    total_reward = 0
+                    losses = []
+                    q_values = []
 
-                for step in range(max_steps_per_ep):
-                    logger.log("\n")
-                    logger.log("full episode list ", agent.episode_visit_list)
-                    logger.log("current list ", agent.current_visit_list)
-                    # Agent takes an action based on the latest observation and info.
-                    action = agent.take_action(state)
+                    for step in range(max_steps_per_ep):
+                        logger.log("\n")
+                        logger.log("full episode list ", agent.episode_visit_list)
+                        logger.log("current list ", agent.current_visit_list)
+                        # Agent takes an action based on the latest observation and info.
+                        action = agent.take_action(state)
 
-                    # The action is performed in the environment, reward depends on the agent's current visit list 
-                    next_state, reward, info, table_or_kitchen_number = env.step(action, agent.current_visit_list)
-                    # Increment total reward for current episode
-                    total_reward += reward
+                        # The action is performed in the environment, reward depends on the agent's current visit list
+                        next_state, reward, info, table_or_kitchen_number = env.step(
+                            action, agent.current_visit_list
+                        )
+                        # Increment total reward for current episode
+                        total_reward += reward
 
-                    q_values.append(torch.max(agent.policy_net(
-                        torch.tensor(encode_input(env, state, agent.current_visit_list), device=agent.device, dtype=torch.float32))).item())
-                    
-                    if trainable:
-                        loss = agent.update(state, info["actual_action"], next_state, reward, ep, table_or_kitchen_number)
+                        q_values.append(
+                            torch.max(
+                                agent.policy_net(
+                                    torch.tensor(
+                                        encode_input(
+                                            env, state, agent.current_visit_list
+                                        ),
+                                        device=agent.device,
+                                        dtype=torch.float32,
+                                    )
+                                )
+                            ).item()
+                        )
+
+                        if trainable:
+                            loss = agent.update(
+                                state,
+                                info["actual_action"],
+                                next_state,
+                                reward,
+                                ep,
+                                table_or_kitchen_number,
+                            )
+                            if loss is not None:
+                                losses.append(loss.item())
+
+                        # Train agent
+                        loss = agent.update(
+                            state,
+                            info["actual_action"],
+                            next_state,
+                            reward,
+                            ep,
+                            table_or_kitchen_number,
+                        )
                         if loss is not None:
                             losses.append(loss.item())
 
-                    # Train agent 
-                    loss = agent.update(state, info["actual_action"], next_state, reward, ep, table_or_kitchen_number)
-                    if loss is not None:
-                        losses.append(loss.item())
+                        state = next_state
 
-                    state = next_state
+                        # If agent has visited all the tables it had to visit, episode is over
+                        if agent.visited_all_tables():
+                            break
 
-                    # If agent has visited all the tables it had to visit, episode is over 
-                    if agent.visited_all_tables():
-                        break
-                    
-                print(f"steps for episode {ep}:, {step}")
-                print(f"number of wrong table visits: {agent.wrong_table_visits}")
-                print(f"percentage of plates delivered: {(agent.correct_table_visits/n_plates)*100}%")
-                print(f"number of visits to kitchen: {agent.visits_to_kitchen}")
+                    print(f"steps for episode {ep}:, {step}")
+                    print(f"number of wrong table visits: {agent.wrong_table_visits}")
+                    print(
+                        f"percentage of plates delivered: {(agent.correct_table_visits/n_plates)*100}%"
+                    )
+                    print(f"number of visits to kitchen: {agent.visits_to_kitchen}")
 
-                avg_loss = sum(losses) / len(losses) if losses else 0
-                print(f"loss: {avg_loss}")
+                    avg_loss = sum(losses) / len(losses) if losses else 0
+                    print(f"loss: {avg_loss}")
 
-                avg_q_value = sum(q_values) / len(q_values) if q_values else 0
-                print(f"avg q val: {avg_q_value}")
+                    avg_q_value = sum(q_values) / len(q_values) if q_values else 0
+                    print(f"avg q val: {avg_q_value}")
 
-                writer.add_scalar('Total Reward', total_reward, ep)
-                writer.add_scalar('Average Loss', avg_loss, ep)
-                writer.add_scalar('Epsilon', agent.end_epsilon + (agent.start_epsilon - agent.end_epsilon) * math.exp(
-                    -1 * agent.steps_completed / agent.decay_steps), ep)
-                writer.add_scalar('Average Q-Value', avg_q_value, ep)
-                if ep%1==0:
-                    print(f'Total Reward for episode {ep}: {total_reward}')
-                if ep%100 == 0:
-                    agent.save_model(model_filename)
-            agent.save_model(model_filename)
+                    writer.add_scalar("Total Reward", total_reward, ep)
+                    writer.add_scalar("Average Loss", avg_loss, ep)
+                    writer.add_scalar(
+                        "Epsilon",
+                        agent.end_epsilon
+                        + (agent.start_epsilon - agent.end_epsilon)
+                        * math.exp(-1 * agent.steps_completed / agent.decay_steps),
+                        ep,
+                    )
+                    writer.add_scalar("Average Q-Value", avg_q_value, ep)
+                    if ep % 1 == 0:
+                        print(f"Total Reward for episode {ep}: {total_reward}")
+                    if ep % 100 == 0:
+                        agent.save_model(model_filename)
+                agent.save_model(model_filename)
+
+                Environment.evaluate_agent(
+                    grid_fp=grid,
+                    agent=agent,
+                    max_steps=max_steps_per_ep,
+                    sigma=env.sigma,
+                    random_seed=random_seed,
+                    logger=logger,
+                )
+        else:
+            raise ValueError(f"Unknown agent type: {agent_type}")
     writer.close()
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
-    main(args.GRID, args.no_gui, args.iter, args.fps, args.sigma, args.random_seed, args.agent_type, args.load_model,
-         args.trainable, args.n_plates, args.capacity)
+    main(
+        args.GRID,
+        args.no_gui,
+        args.iter,
+        args.fps,
+        args.sigma,
+        args.random_seed,
+        args.agent_type,
+        args.load_model,
+        args.trainable,
+        args.n_plates,
+        args.capacity,
+        args.hyperparameter_tuning,
+    )

@@ -1,5 +1,30 @@
 from collections import defaultdict
 import numpy as np
+import torch
+
+def init_metrics_dict():
+    metrics_dict = {
+        "Steps taken": [],
+        "Kitchen visits": [],
+        "Wrong table visits": [],
+        "Epsilon": [],
+        "Plates delivered (%)": [],
+        "Total reward": [],
+    }
+    return metrics_dict
+
+def get_device():
+    # Check if a GPU is available
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        device_name = torch.cuda.get_device_name(device)
+        print(f"Using GPU: {device_name}")
+    # Default to CPU
+    else:
+        device = torch.device("cpu")
+        print("Using CPU")
+    
+    return device
 
 class Logger():
     def __init__(self, print_on=False):

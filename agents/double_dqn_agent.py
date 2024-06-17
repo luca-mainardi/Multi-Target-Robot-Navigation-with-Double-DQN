@@ -39,9 +39,6 @@ class DoubleDQNAgent(BaseAgent):
         self.episode_visit_list = [] # all tables that the agent must visit in an episode 
         self.current_visit_list = [] # tables that the agent can store in its capacity 
         self.logger = logger
-        self.wrong_table_visits = 0
-        self.visits_to_kitchen = 0
-        self.correct_table_visits = 0
 
     def visited_all_tables(self):
         return self.correct_table_visits == self.n_tables
@@ -77,7 +74,8 @@ class DoubleDQNAgent(BaseAgent):
             elif table_or_kitchen_number is not None: # visited a wrong table 
                 self.wrong_table_visits += 1
 
-    def update(self, state:  tuple[int, int], action: int, next_state: tuple[int, int], reward: float, episode: int, table_or_kitchen_number: int):
+    def update(self, state:  tuple[int, int], action: int, next_state: tuple[int, int], reward: float, 
+               table_or_kitchen_number: int, trainable: bool):
         """
         Update the DQN agent after performing an action in the environment. 
         """
@@ -96,11 +94,13 @@ class DoubleDQNAgent(BaseAgent):
         self.memory.push(state, action, next_state, reward)
 
         # Train the policy network using experience replay
-        loss = self.train_policy_network(batch_size=self.batch_size)
-
-        # Soft copy params from policy network to target network 
-        self.soft_update_target_network(tau=0.005)
+        if trainable:
+            loss = self.train_policy_network(batch_size=self.batch_size)
+            # Soft copy params from policy network to target network 
+            self.soft_update_target_network(tau=0.005)
+        else: loss = None
         return loss
+        
 
     def save_model(self, filepath):
         """Save the model to a file."""
@@ -140,6 +140,7 @@ class DoubleDQNAgent(BaseAgent):
         # Calculate epsilon for this step
         epsilon_threshold = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * \
             math.exp(-1 * self.steps_completed / self.decay_steps)
+        
         # epsilon_threshold = 0.1
         if self.trainable:
             self.set_epsilon(epsilon_threshold)
@@ -150,7 +151,7 @@ class DoubleDQNAgent(BaseAgent):
         self.steps_completed += 1
 
         # Greedy action calculated by policy net 
-        if rand > self.epsilon or evaluation:
+        if rand > self.epsilon or not self.trainable:
             with torch.no_grad():
                 return torch.argmax(self.policy_net(state)).item()
 

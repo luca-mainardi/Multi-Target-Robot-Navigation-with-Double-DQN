@@ -146,7 +146,6 @@ class Environment:
         """Initializes agent position from the given location or
         randomly chooses one if None was given.
         """
-
         if self.agent_start_pos is not None:
             pos = (self.agent_start_pos[0], self.agent_start_pos[1])
             if self.grid[pos] == 0:
@@ -161,9 +160,14 @@ class Environment:
             warn("No initial agent positions given. Randomly placing agents "
                  "on the grid.")
             # Find all empty locations and choose one at random
+                
             zeros = np.where(self.grid == 0)
-            idx = random.randint(0, len(zeros[0]) - 1)
-            self.agent_pos = (zeros[0][idx], zeros[1][idx])
+            while True:
+                idx = random.randint(0, len(zeros[0]) - 1)
+                self.agent_pos = (zeros[0][idx], zeros[1][idx])
+                if self.agent_pos[0] not in range(0,9) or self.agent_pos[1] not in range(9, 18):
+                    break
+            # print("POSITION ", self.agent_pos)
 
     def reset(self, **kwargs) -> tuple[int, int]:
         """Reset the environment to an initial state.
@@ -198,7 +202,7 @@ class Environment:
         self.info = self._reset_info()
         self.world_stats = self._reset_world_stats()
         self.table_visit_list = [random.randint(1, self.n_tables) for _ in range(self.n_plates)]
-        print("Table visit list: ", self.table_visit_list)
+        # print("Table visit list: ", self.table_visit_list)
 
         # GUI specific code
         if not self.no_gui:

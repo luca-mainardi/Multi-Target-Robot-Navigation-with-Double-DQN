@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch
 import math
 from agents.double_dqn_agent import DoubleDQNAgent
+from experiments import hyperparameter_search
 from utils import *
 
 try:
@@ -17,12 +18,14 @@ except ModuleNotFoundError:
     from os import path
     from os import pardir
     import sys
-    root_path = path.abspath(path.join(
-        path.join(path.abspath(__file__), pardir), pardir)
+
+    root_path = path.abspath(
+        path.join(path.join(path.abspath(__file__), pardir), pardir)
     )
     if root_path not in sys.path:
         sys.path.extend(root_path)
     from world import Environment
+
 
 def parse_args():
     p = ArgumentParser(description="DIC Reinforcement Learning Trainer.")
@@ -50,6 +53,11 @@ def parse_args():
                 help="Total number of plates to deliver per episode.")
     p.add_argument("--capacity", type=int, default=3,
             help="Number of plates an agent can carry at a time.")
+    p.add_argument(
+        "--hyperparameter_tuning",
+        action="store_true",
+        help="If set, perform a hyperparameter tuning.",
+    )
     return p.parse_args()
 
 # Set to true for debug prints
@@ -98,7 +106,7 @@ def run_episode(env, agent, max_steps, trainable):
 
 def main(grid: Path, no_gui: bool, iters: int, fps: int,
          sigma: float, random_seed: int, agent_type: str, load_model_path: Path, 
-         trainable: bool, n_plates: int, capacity: int):
+         trainable: bool, n_plates: int, capacity: int, hyperparameter_tuning: bool = False):
     """Main loop of the program."""
         
     # Set up the environment
@@ -109,73 +117,78 @@ def main(grid: Path, no_gui: bool, iters: int, fps: int,
     model_filename = f"{grid.stem}_iters_{iters}.pth"
     
     if agent_type == "ddqn":
-        # Maximum possible steps per episode 
-        grid_size = env.grid.shape[0] * env.grid.shape[1] 
-        max_steps_per_ep = int(n_plates * (grid_size*0.2))
         
-        # Defines at which training step to reach minimum epsilon
-        decay_steps = max_steps_per_ep * iters * 0.4
-        
-        # Initialize agent 
-        agent = DoubleDQNAgent(env, start_epsilon=0.99, end_epsilon=0.01, decay_steps=decay_steps, 
-                                gamma=0.90, capacity = capacity, device=get_device())
-        
-        # Optional: load model from path 
-        if load_model_path:
-            agent.load_model(load_model_path, trainable)
-        else:
-            trainable = True
-        
-        # Initialize training metrics storage dict
-        training_metrics = init_metrics_dict()
-        
-        # Run training loop 
-        for ep in range(iters):
-            print(f"\nEpisode {ep}")
+        if hyperparameter_tuning:
+            hyperparameter_search(env, iters, device=get_device())
             
-            # Run a training episode 
-            n_steps, total_reward, _, _ = run_episode(env, agent, max_steps_per_ep, trainable)
+        else:  # Train the agent    
+            # Maximum possible steps per episode 
+            grid_size = env.grid.shape[0] * env.grid.shape[1] 
+            max_steps_per_ep = int(n_plates * (grid_size*0.2))
             
-            # Fill metrics
-            training_metrics["Steps taken"].append(n_steps)
-            training_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
-            training_metrics["Wrong table visits"].append(agent.wrong_table_visits)
-            training_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
-            training_metrics["Epsilon"].append(agent.epsilon)
-            training_metrics["Total reward"].append(total_reward)
+            # Defines at which training step to reach minimum epsilon
+            decay_steps = max_steps_per_ep * iters * 0.4
+            
+            # Initialize agent 
+            agent = DoubleDQNAgent(env, start_epsilon=0.99, end_epsilon=0.01, decay_steps=decay_steps, 
+                                    gamma=0.90, capacity = capacity, device=get_device())
+            
+            # Optional: load model from path 
+            if load_model_path:
+                agent.load_model(load_model_path, trainable)
+            else:
+                trainable = True
+            
+            # Initialize training metrics storage dict
+            training_metrics = init_metrics_dict()
+            
+            # Run training loop 
+            for ep in range(iters):
+                print(f"\nEpisode {ep}")
+                
+                # Run a training episode 
+                n_steps, total_reward, _, _ = run_episode(env, agent, max_steps_per_ep, trainable)
+                
+                # Fill metrics
+                training_metrics["Steps taken"].append(n_steps)
+                training_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
+                training_metrics["Wrong table visits"].append(agent.wrong_table_visits)
+                training_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
+                training_metrics["Epsilon"].append(agent.epsilon)
+                training_metrics["Total reward"].append(total_reward)
+                
+                # Print metrics
+                for key, value in training_metrics.items():
+                    print(key, value[ep])
+                
+                # Save model checkpoint every 100 episodes
+                if ep%100 == 0:
+                    agent.save_model(model_filename)
+                    
+            # Save model at end of training
+            agent.save_model(model_filename)  
+            
+            # Evaluate final agent (no training)
+            evaluation_metrics = init_metrics_dict()
+            evaluation_steps = 100
+            print("\nFinished training, evaluating agent (no training, no epsilon-greedy)")
+            for ep in trange(evaluation_steps):
+                n_steps, total_reward, _, _ = run_episode(env, agent, max_steps_per_ep, trainable=False)
+                # Fill metrics
+                evaluation_metrics["Steps taken"].append(n_steps)
+                evaluation_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
+                evaluation_metrics["Wrong table visits"].append(agent.wrong_table_visits)
+                evaluation_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
+                evaluation_metrics["Epsilon"].append(agent.epsilon)
+                evaluation_metrics["Total reward"].append(total_reward)
             
             # Print metrics
-            for key, value in training_metrics.items():
-                print(key, value[ep])
-            
-            # Save model checkpoint every 100 episodes
-            if ep%100 == 0:
-                agent.save_model(model_filename)
-                
-        # Save model at end of training
-        agent.save_model(model_filename)  
-        
-        # Evaluate final agent (no training)
-        evaluation_metrics = init_metrics_dict()
-        evaluation_steps = 100
-        print("\nFinished training, evaluating agent (no training, no epsilon-greedy)")
-        for ep in trange(evaluation_steps):
-            n_steps, total_reward, _, _ = run_episode(env, agent, max_steps_per_ep, trainable=False)
-            # Fill metrics
-            evaluation_metrics["Steps taken"].append(n_steps)
-            evaluation_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
-            evaluation_metrics["Wrong table visits"].append(agent.wrong_table_visits)
-            evaluation_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
-            evaluation_metrics["Epsilon"].append(agent.epsilon)
-            evaluation_metrics["Total reward"].append(total_reward)
-        
-        # Print metrics
-        print(f"\nAverage metrics over {evaluation_steps} evaluation steps")
-        for key, value in evaluation_metrics.items():
-            print(key, np.mean(value))
+            print(f"\nAverage metrics over {evaluation_steps} evaluation steps")
+            for key, value in evaluation_metrics.items():
+                print(key, np.mean(value))
         
             
 if __name__ == '__main__':
     args = parse_args()
     main(args.GRID, args.no_gui, args.iter, args.fps, args.sigma, args.random_seed, args.agent_type, args.load_model_path,
-         args.trainable, args.n_plates, args.capacity)
+         args.trainable, args.n_plates, args.capacity, args.hyperparameter_tuning)

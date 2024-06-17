@@ -1,6 +1,7 @@
 """
 Environment.
 """
+
 import random
 import datetime
 import numpy as np
@@ -23,8 +24,8 @@ except ModuleNotFoundError:
     from os import pardir
     import sys
 
-    root_path = path.abspath(path.join(
-        path.join(path.abspath(__file__), pardir), pardir)
+    root_path = path.abspath(
+        path.join(path.join(path.abspath(__file__), pardir), pardir)
     )
 
     if root_path not in sys.path:
@@ -35,18 +36,20 @@ except ModuleNotFoundError:
     from world.gui import GUI
     from world.path_visualizer import visualize_path
 
+
 class Environment:
-    def __init__(self,
-                 grid_fp: Path,
-                 no_gui: bool = False,
-                 sigma: float = 0.,
-                 agent_start_pos: tuple[int, int] = None,
-                 reward_fn: callable = None,
-                 target_fps: int = 30,
-                 random_seed: int | float | str | bytes | bytearray | None = 0,
-                 logger: Logger = None,
-                 n_plates : int = 10):
-        
+    def __init__(
+        self,
+        grid_fp: Path,
+        no_gui: bool = False,
+        sigma: float = 0.0,
+        agent_start_pos: tuple[int, int] = None,
+        reward_fn: callable = None,
+        target_fps: int = 30,
+        random_seed: int | float | str | bytes | bytearray | None = 0,
+        logger: Logger = None,
+        n_plates: int = 10,
+    ):
         """Creates the Grid Environment for the Reinforcement Learning robot
         from the provided file.
 
@@ -64,7 +67,7 @@ class Environment:
                 If None is provided, then a random start position is used.
             agent_max_capacity: Int value that indicates the maximum number of foods the agent can carry.
             agent_storage_level: int value that indicates the current number of food the agent is carrying.
-            reward_fn: Custom reward function to use. 
+            reward_fn: Custom reward function to use.
             target_fps: How fast the simulation should run if it is being shown
                 in a GUI. If in no_gui mode, then the simulation will run as fast as
                 possible. We may set a low FPS so we can actually see what's
@@ -88,7 +91,7 @@ class Environment:
         self.kitchen_cells = []
         self.table_cells = []
         self.logger = logger
-        self.n_plates = n_plates # total number of plates per episode 
+        self.n_plates = n_plates  # total number of plates per episode
 
         # Set up reward function
         if reward_fn is None:
@@ -100,9 +103,9 @@ class Environment:
         # GUI specific code: Set up the environment as a blank state.
         self.no_gui = no_gui
         if target_fps <= 0:
-            self.target_spf = 0.
+            self.target_spf = 0.0
         else:
-            self.target_spf = 1. / target_fps
+            self.target_spf = 1.0 / target_fps
         self.gui = None
 
         self.grid = Grid.load_grid(self.grid_fp).cells
@@ -110,7 +113,7 @@ class Environment:
             for col in range(self.grid.shape[1]):
                 if self.grid[row, col] == 6:  # 6 represents a table cell
                     self.table_cells.append((row, col))
-                if self.grid[row, col] == 5: # 5 represents a kitchen cell
+                if self.grid[row, col] == 5:  # 5 represents a kitchen cell
                     self.kitchen_cells.append((row, col))
 
         # Find the blocks
@@ -123,24 +126,23 @@ class Environment:
         consisting of whether the target was reached or the agent
         moved and the updated agent position.
         """
-        return {"target_reached": False,
-                "agent_moved": False,
-                "actual_action": None}
-    
+        return {"target_reached": False, "agent_moved": False, "actual_action": None}
+
     @staticmethod
     def _reset_world_stats() -> dict:
         """Resets the world stats dictionary.
 
-        world_stats is a dict with information about the 
+        world_stats is a dict with information about the
         environment since last env.reset(). Basically, it
         accumulates information.
         """
-        return {"cumulative_reward": 0,
-                "total_steps": 0,
-                "total_agent_moves": 0,
-                "total_failed_moves": 0,
-                "total_targets_reached": 0,
-                }
+        return {
+            "cumulative_reward": 0,
+            "total_steps": 0,
+            "total_agent_moves": 0,
+            "total_failed_moves": 0,
+            "total_targets_reached": 0,
+        }
 
     def _initialize_agent_pos(self):
         """Initializes agent position from the given location or
@@ -154,11 +156,14 @@ class Environment:
             else:
                 raise ValueError(
                     "Attempted to place agent on top of obstacle, delivery"
-                    "location or charger")
+                    "location or charger"
+                )
         else:
             # No positions were given. We place agents randomly.
-            warn("No initial agent positions given. Randomly placing agents "
-                 "on the grid.")
+            warn(
+                "No initial agent positions given. Randomly placing agents "
+                "on the grid."
+            )
             # Find all empty locations and choose one at random
                 
             zeros = np.where(self.grid == 0)
@@ -172,7 +177,7 @@ class Environment:
     def reset(self, **kwargs) -> tuple[int, int]:
         """Reset the environment to an initial state.
 
-        You can fit it keyword arguments which will overwrite the 
+        You can fit it keyword arguments which will overwrite the
         initial arguments provided when initializing the environment.
 
         Args:
@@ -191,11 +196,12 @@ class Environment:
                 case "no_gui":
                     self.no_gui = v
                 case "target_fps":
-                    self.target_spf = 1. / v
+                    self.target_spf = 1.0 / v
                 case _:
-                    raise ValueError(f"{k} is not one of the possible "
-                                     f"keyword arguments.")
-        
+                    raise ValueError(
+                        f"{k} is not one of the possible " f"keyword arguments."
+                    )
+
         # Reset variables
         self.grid = Grid.load_grid(self.grid_fp).cells
         self._initialize_agent_pos()
@@ -215,7 +221,7 @@ class Environment:
         return self.agent_pos, self.table_visit_list
 
     def _move_agent(self, new_pos: tuple[int, int]):
-        """Moves the agent, if possible and updates the 
+        """Moves the agent, if possible and updates the
         corresponding stats.
 
         Args:
@@ -239,9 +245,13 @@ class Environment:
             self.world_stats["total_failed_moves"] += 1
             self.info["agent_moved"] = False
         else:
-            raise ValueError(f"Grid is badly formed. It has a value of {self.grid[new_pos]} at position {new_pos}.")
+            raise ValueError(
+                f"Grid is badly formed. It has a value of {self.grid[new_pos]} at position {new_pos}."
+            )
 
-    def step(self, action: int, agent_current_visit_list: list) -> tuple[np.ndarray, float, bool]:
+    def step(
+        self, action: int, agent_current_visit_list: list
+    ) -> tuple[np.ndarray, float, bool]:
         """This function makes the agent take a step on the grid.
 
         Action is provided as integer and values are:
@@ -253,16 +263,16 @@ class Environment:
             - 5: Pick-up food
         Args:
             action: Integer representing the action the agent should
-                take. 
+                take.
 
         Returns:
             0) Current state,
             1) The reward for the agent,
             2) If the terminal state has been reached, and
         """
-        
+
         self.world_stats["total_steps"] += 1
-        
+
         # GUI specific code
         is_single_step = False
         if not self.no_gui:
@@ -276,9 +286,15 @@ class Environment:
                 # Otherwise, we render the current state only
                 paused_info = self._reset_info()
                 paused_info["agent_moved"] = True
-                self.gui.render(self.grid, self.agent_pos, paused_info,
-                                0, self.agent_storage_level,
-                                agent_current_visit_list, is_single_step)
+                self.gui.render(
+                    self.grid,
+                    self.agent_pos,
+                    paused_info,
+                    0,
+                    self.agent_storage_level,
+                    agent_current_visit_list,
+                    is_single_step,
+                )
 
         # Add stochasticity into the agent action
         val = random.random()
@@ -286,26 +302,29 @@ class Environment:
             actual_action = action
         else:
             actual_action = random.randint(0, 3)
-        
+
         # Make the move
         self.info["actual_action"] = actual_action
 
         reward = 0
-        if actual_action <= 3: # up, down, left, right
+        if actual_action <= 3:  # up, down, left, right
             direction = action_to_direction(actual_action)
-            new_pos = (self.agent_pos[0] + direction[0], self.agent_pos[1] + direction[1])
+            new_pos = (
+                self.agent_pos[0] + direction[0],
+                self.agent_pos[1] + direction[1],
+            )
         self.logger.log("Actual action ", actual_action)
-        # Get table number or 0 if new_pos is kitchen 
+        # Get table number or 0 if new_pos is kitchen
         if new_pos in self.kitchen_cells:
-            table_or_kitchen_number = 0 # represents kitchen 
+            table_or_kitchen_number = 0  # represents kitchen
         elif new_pos in self.table_cells:
-            table_or_kitchen_number = self.table_number_mapping[new_pos] # table number
+            table_or_kitchen_number = self.table_number_mapping[new_pos]  # table number
         else:
             table_or_kitchen_number = None
         self.logger.log("Table or kitchen number ", table_or_kitchen_number)
 
         # Calculate the reward for the agent
-        reward = self.reward_fn(new_pos, agent_current_visit_list) 
+        reward = self.reward_fn(new_pos, agent_current_visit_list)
         self.logger.log("Reward ", reward)
         self._move_agent(new_pos)
 
@@ -339,12 +358,17 @@ class Environment:
             time_to_wait = self.target_spf - (time() - start_time)
             if time_to_wait > 0:
                 sleep(time_to_wait)
-            self.gui.render(self.grid, self.agent_pos, self.info,
-                            reward, self.agent_storage_level,
-                            agent_current_visit_list, is_single_step)
+            self.gui.render(
+                self.grid,
+                self.agent_pos,
+                self.info,
+                reward,
+                self.agent_storage_level,
+                agent_current_visit_list,
+                is_single_step,
+            )
 
         return self.agent_pos, reward, self.info, table_or_kitchen_number
-
 
     def _default_reward_fn(self, agent_pos, visit_list) -> float:
         """
@@ -358,40 +382,46 @@ class Environment:
             action.
         """
         match self.grid[agent_pos]:
-            case 0: # empty tile
+            case 0:  # empty tile
                 reward = -0.1
-            case 1 | 2: # wall or obstacle 
-                reward = -1 
-            case 5: # kitchen
+            case 1 | 2:  # wall or obstacle
+                reward = -1
+            case 5:  # kitchen
                 if visit_list == [0]:
-                    reward = 1 # visited when kitchen was the goal 
+                    reward = 1  # visited when kitchen was the goal
                 else:
-                    reward = -2 # visited when kitchen was not the goal 
-            case 6: # table 
-                table_number = self.table_number_mapping[agent_pos] 
+                    reward = -2  # visited when kitchen was not the goal
+            case 6:  # table
+                table_number = self.table_number_mapping[agent_pos]
                 if table_number in visit_list:
-                    count = visit_list.count(table_number) # number of times table appears in visit list
-                    reward = count * 10 # correct table
-                else: 
-                    reward = -5 # wrong table 
-            case _: # illegal 
-                raise ValueError(f"Grid cell should not have value: {self.grid[agent_pos]}.",
-                    f"at position {agent_pos}")
+                    count = visit_list.count(
+                        table_number
+                    )  # number of times table appears in visit list
+                    reward = count * 10  # correct table
+                else:
+                    reward = -5  # wrong table
+            case _:  # illegal
+                raise ValueError(
+                    f"Grid cell should not have value: {self.grid[agent_pos]}.",
+                    f"at position {agent_pos}",
+                )
 
         return reward
 
     def calc_manhattan_distance(self, pos1, pos2):
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
-    
 
     @staticmethod
-    def evaluate_agent(grid_fp: Path,
-                       agent: BaseAgent,
-                       max_steps: int,
-                       sigma: float = 0.,
-                       agent_start_pos: tuple[int, int] = None,
-                       random_seed: int | float | str | bytes | bytearray = 0,
-                       show_images: bool = False):
+    def evaluate_agent(
+        grid_fp: Path,
+        agent: BaseAgent,
+        max_steps: int,
+        sigma: float = 0.0,
+        agent_start_pos: tuple[int, int] = None,
+        random_seed: int | float | str | bytes | bytearray = 0,
+        show_images: bool = False,
+        logger: Logger = None,
+    ):
         """Evaluates a single trained agent's performance.
 
         What this does is it creates a completely new environment from the
@@ -414,27 +444,47 @@ class Environment:
                 evaluation. If False, only saves the images.
         """
 
-        env = Environment(grid_fp=grid_fp,
-                          no_gui=True,
-                          sigma=sigma,
-                          agent_start_pos=agent_start_pos,
-                          target_fps=-1,
-                          random_seed=random_seed)
-        
-        state = env.reset()
+        env = Environment(
+            grid_fp=grid_fp,
+            no_gui=True,
+            sigma=sigma,
+            agent_start_pos=agent_start_pos,
+            target_fps=-1,
+            random_seed=random_seed,
+            logger=logger,
+        )
+
+        state, tables_to_visit = env.reset()
+        agent.inject_episode_table_list(tables_to_visit)
         initial_grid = np.copy(env.grid)
 
         # Add initial agent position to the path
         agent_path = [env.agent_pos]
 
         for _ in trange(max_steps, desc="Evaluating agent"):
-            
+
             action = agent.take_action(state, evaluation=True)
-            state, _, terminated, _ = env.step(action)
+
+            next_state, reward, info, table_or_kitchen_number = env.step(
+                action, agent.current_visit_list
+            )
+
+            loss = agent.update(
+                state,
+                info["actual_action"],
+                next_state,
+                reward,
+                episode=0,
+                table_or_kitchen_number=table_or_kitchen_number,
+            )
+            # agent.update_current_visit_list(table_or_kitchen_number)
+
+            state = next_state
 
             agent_path.append(state)
 
-            if terminated:
+            # If agent has visited all the tables it had to visit, episode is over
+            if agent.visited_all_tables():
                 break
 
         env.world_stats["targets_remaining"] = np.sum(env.grid == 3)

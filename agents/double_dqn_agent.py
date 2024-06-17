@@ -60,7 +60,6 @@ class DoubleDQNAgent(BaseAgent):
                 self.current_visit_list = self.current_visit_list = self.episode_visit_list[0:self.capacity] 
                 self.episode_visit_list = self.episode_visit_list[self.capacity:]  
                 self.visits_to_kitchen += 1
-
             elif len(self.current_visit_list) < self.capacity: # ...with space for more plates: then calculate space, refill list 
                 remaining_capacity = self.capacity - len(self.current_visit_list)  
                 self.current_visit_list += self.episode_visit_list[0:remaining_capacity]
@@ -69,8 +68,9 @@ class DoubleDQNAgent(BaseAgent):
 
         if table_or_kitchen_number != 0: # visited table... 
             if table_or_kitchen_number in self.current_visit_list: # ...when table was in list 
+                n_appearances = self.current_visit_list.count(table_or_kitchen_number) # number of times the table appears in the list
                 self.current_visit_list = [table for table in self.current_visit_list if table != table_or_kitchen_number] # remove table from list 
-                self.correct_table_visits += 1
+                self.correct_table_visits += 1*n_appearances
                 if len(self.current_visit_list) == 0: # if list is empty after visit, go to kitchen 
                     self.current_visit_list = [0]
             elif table_or_kitchen_number is not None: # visited a wrong table 

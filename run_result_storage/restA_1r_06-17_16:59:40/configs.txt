@@ -1,0 +1,11 @@
+agent type: ddqn
+grid name: restA_1r
+training iterations: 1000
+evaluation iterations: 100
+sigma: 0.0
+random seed: 0
+n_plates: 6
+capacity: 3
+max steps per episode: 319
+decay_steps: 127600.0
+load model path: run_result_storage/restA_1r_06-17_16:57:02/model

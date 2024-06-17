@@ -1,8 +1,46 @@
 from collections import defaultdict
 import numpy as np
 import torch
+import os 
+from datetime import datetime
+import matplotlib.pyplot as plt
+
+def make_storage_dir(grid_name, configs):
+    """
+    Create directory to store run configs and results.
+    """
+    now = datetime.now()
+    current_time = now.strftime("%m-%d_%H:%M:%S")
+    folder_name = f"{grid_name}_{current_time}"
+    
+    # Define the name of the directory to be created
+    parent_dir = "run_result_storage"
+
+    # Create the parent directory if it does not exist
+    if not os.path.exists(parent_dir):
+        os.makedirs(parent_dir)
+        print(f"Directory '{parent_dir}' created")
+
+    # Define the path for the subfolder
+    sub_dir_path = os.path.join(parent_dir, folder_name)
+
+    # Create the subfolder
+    if not os.path.exists(sub_dir_path):
+        os.makedirs(sub_dir_path)
+        print(f"Subdirectory '{folder_name}' created inside '{parent_dir}'")
+    
+    # Save dictionary to a text file
+    with open(os.path.join(parent_dir, folder_name, "configs.txt"), 'w') as file:
+        for key, value in configs.items():
+            file.write(f'{key}: {value}\n')
+
+    return sub_dir_path
 
 def init_metrics_dict():
+    """
+    Initialize a dictionary to 
+    store agent evaluation metrics.
+    """
     metrics_dict = {
         "Steps taken": [],
         "Kitchen visits": [],
@@ -13,7 +51,30 @@ def init_metrics_dict():
     }
     return metrics_dict
 
+def save_metrics(path, file_name, metric_dict):
+    """
+    Save a metric dictionary to a file.
+    """
+    with open(os.path.join(path, file_name), 'w') as file:
+        for key, value in metric_dict.items():
+            file.write(f'{key}: {value}\n')
+    print(f"\nCreated {file_name} file")
+    
+
+def save_reward_plot(metric_dict, path):
+    """
+    Plot reward from a metric dictionary
+    and save to a file. 
+    """
+    plt.plot(metric_dict["Total reward"])
+    plt.xlabel("Episode")
+    plt.ylabel("Total reward")
+    plt.savefig(os.path.join(path, "reward_plot"))
+   
 def get_device():
+    """ 
+    Get device to train on. 
+    """
     # Check if a GPU is available
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -25,14 +86,6 @@ def get_device():
         print("Using CPU")
     
     return device
-
-class Logger():
-    def __init__(self, print_on=False):
-        self.print_on = print_on
-
-    def log(self, variable, message=None):
-        if self.print_on:
-            print(message, variable)
 
 def find_blocks(table_cells):
     """

@@ -4,3 +4,5 @@ runs/Jun09_13-05-01_Annikas-MacBook-Pro.local/events.out.tfevents.1717931101.Ann
 *.0
 /.venv
 /runs
+*.pyc
+*.pyc

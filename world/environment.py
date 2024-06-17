@@ -47,7 +47,6 @@ class Environment:
         reward_fn: callable = None,
         target_fps: int = 30,
         random_seed: int | float | str | bytes | bytearray | None = 0,
-        logger: Logger = None,
         n_plates: int = 10,
     ):
         """Creates the Grid Environment for the Reinforcement Learning robot
@@ -90,12 +89,10 @@ class Environment:
         self.sigma = sigma
         self.kitchen_cells = []
         self.table_cells = []
-        self.logger = logger
         self.n_plates = n_plates  # total number of plates per episode
 
         # Set up reward function
         if reward_fn is None:
-            warn("No reward function provided. Using default reward.")
             self.reward_fn = self._default_reward_fn
         else:
             self.reward_fn = reward_fn
@@ -160,10 +157,10 @@ class Environment:
                 )
         else:
             # No positions were given. We place agents randomly.
-            warn(
-                "No initial agent positions given. Randomly placing agents "
-                "on the grid."
-            )
+            # warn(
+            #     "No initial agent positions given. Randomly placing agents "
+            #     "on the grid."
+            # )
             # Find all empty locations and choose one at random
                 
             zeros = np.where(self.grid == 0)
@@ -313,7 +310,6 @@ class Environment:
                 self.agent_pos[0] + direction[0],
                 self.agent_pos[1] + direction[1],
             )
-        self.logger.log("Actual action ", actual_action)
         # Get table number or 0 if new_pos is kitchen
         if new_pos in self.kitchen_cells:
             table_or_kitchen_number = 0  # represents kitchen
@@ -321,35 +317,10 @@ class Environment:
             table_or_kitchen_number = self.table_number_mapping[new_pos]  # table number
         else:
             table_or_kitchen_number = None
-        self.logger.log("Table or kitchen number ", table_or_kitchen_number)
 
         # Calculate the reward for the agent
         reward = self.reward_fn(new_pos, agent_current_visit_list)
-        self.logger.log("Reward ", reward)
         self._move_agent(new_pos)
-
-        # elif actual_action == 4:  # delivery
-        #     self.agent_storage_level = max(0, self.agent_storage_level - 1)
-        #     delivery_pickup_case = 2
-        #     self.world_stats["total_failed_moves"] += 1
-
-        #     for customer in self.customers:
-        #         if self.calc_manhattan_distance(customer, self.agent_pos) < 2:
-        #             self.world_stats["total_failed_moves"] -= 1
-        #             delivery_pickup_case = 1
-        #             self.customers.remove(customer)
-        #             break
-
-        #     reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
-        #     if reward == 50:
-        #         print("HERE")
-
-        # elif actual_action == 5:  # pickup
-        #     if self.grid[self.agent_pos] != 5:
-        #         delivery_pickup_case = 3
-        #     else:
-        #         delivery_pickup_case = 4
-        #     reward = self.reward_fn(self.grid, self.agent_pos, delivery_pickup_case)
 
         self.world_stats["cumulative_reward"] += reward
 
@@ -420,7 +391,6 @@ class Environment:
         agent_start_pos: tuple[int, int] = None,
         random_seed: int | float | str | bytes | bytearray = 0,
         show_images: bool = False,
-        logger: Logger = None,
     ):
         """Evaluates a single trained agent's performance.
 
@@ -451,7 +421,6 @@ class Environment:
             agent_start_pos=agent_start_pos,
             target_fps=-1,
             random_seed=random_seed,
-            logger=logger,
         )
 
         state, tables_to_visit = env.reset()

@@ -52,6 +52,9 @@ def parse_args():
                    help="Path to a pre-trained model to load.")
     p.add_argument("--n_plates", type=int, default=10,
                 help="Total number of plates to deliver per episode.")
+    p.add_argument("--trainable", type=bool, default=True,
+                   help="If the agent should continue training or not")
+
     p.add_argument("--capacity", type=int, default=3,
             help="Number of plates an agent can carry at a time.")
     p.add_argument(
@@ -109,7 +112,7 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
     """Main loop of the program."""
     
     # Warnings based on command line arguments given 
-    if train_iter and load_model_path: 
+    if train_iter and load_model_path:
         print("\nWarning: received both training iterations and a pre-trained model path. Will only evaluate the model, not train! \n")
     if eval_iter > 0 and train_iter == 0 and not load_model_path:
         print("Error: cannot evaluate without training first or a pre-trained model.")
@@ -142,8 +145,9 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
     }
     
     # Create folder to store configs andt training/evaluation results
-    save_path = make_storage_dir(grid.stem, configs)
-            
+    # save_path = make_storage_dir(grid.stem, configs)
+    save_path = ""
+
     if agent_type == "ddqn":
         
         # Perform hyperparameter tuning
@@ -153,7 +157,7 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
         # Train/evaluate the agent
         else:     
             # Initialize agent 
-            agent = DoubleDQNAgent(env, start_epsilon=0.99, end_epsilon=0.01, decay_steps=decay_steps, 
+            agent = DoubleDQNAgent(env, start_epsilon=0.4, end_epsilon=0.01, decay_steps=decay_steps,
                                     gamma=0.90, capacity = capacity, device=get_device())
             
             # Load model from path and set training mode to False
@@ -164,28 +168,38 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
             # Train agent 
             if agent.should_train: 
                 training_metrics = init_metrics_dict()
-                
+                best_avg_reward = -float('inf')
+                patience_counter = 0
+
                 # Iterate through training episodes
                 for ep in range(train_iter):
                     print(f"\nEpisode {ep}")
-                    n_steps, total_reward, _, _ = run_episode(env, agent, max_steps_per_ep)
+                    n_steps, total_reward, avg_loss, _ = run_episode(env, agent, max_steps_per_ep)
                     training_metrics["Steps taken"].append(n_steps)
                     training_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
                     training_metrics["Wrong table visits"].append(agent.wrong_table_visits)
                     training_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
                     training_metrics["Epsilon"].append(agent.epsilon)
                     training_metrics["Total reward"].append(total_reward)
-                    
+                    training_metrics["Loss"].append(avg_loss)
+
                     # Print metrics every episode
                     for key, value in training_metrics.items():
                         print(key, value[ep])
                     
                     # Save model checkpoint every 100 episodes
                     if ep%100 == 0:
-                        agent.save_model(os.path.join(save_path, "model"))
-                        
+                        agent.save_model(os.path.join(save_path, f"{grid.stem}_iters_{train_iter}.pth"))
+
+                    best_avg_reward, patience_counter = early_stopping(training_metrics["Total reward"], best_avg_reward,
+                                                                                   patience_counter)
+                    if patience_counter > 0 and patience_counter % 10 == 0:
+                        print("early stopping counter :", patience_counter)
+                    if patience_counter >= 80:
+                        print(f"No improvement in reward for 80 episodes. Stopping training.")
+                        break
                 # Save model and metrics at end of training
-                agent.save_model(os.path.join(save_path, "model"))  
+                agent.save_model(os.path.join(save_path, f"{grid.stem}_iters_{train_iter}.pth"))
                 save_metrics(save_path, "training_metrics.txt", training_metrics)
                 save_reward_plot(training_metrics, save_path)
                 
@@ -212,6 +226,7 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
                     
                 # Save metrics 
                 save_metrics(save_path, "evaluation_metrics.txt", evaluation_metrics)
+
 
 if __name__ == '__main__':
     args = parse_args()

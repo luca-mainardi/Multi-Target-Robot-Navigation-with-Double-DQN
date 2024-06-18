@@ -48,8 +48,10 @@ def init_metrics_dict():
         "Epsilon": [],
         "Plates delivered (%)": [],
         "Total reward": [],
+        "Loss": [],
     }
     return metrics_dict
+
 
 def save_metrics(path, file_name, metric_dict):
     """
@@ -59,12 +61,28 @@ def save_metrics(path, file_name, metric_dict):
         for key, value in metric_dict.items():
             file.write(f'{key}: {value}\n')
     print(f"\nCreated {file_name} file")
-    
+
+
+def early_stopping(cumulative_rewards, best_avg_reward, patience_counter):
+    """Update the best average reward and check if we should stop training."""
+    if len(cumulative_rewards) < 20:
+        return best_avg_reward, 0  # Not enough episodes to compute average yet
+
+    current_avg_reward = np.mean(cumulative_rewards[-20:])
+
+    if current_avg_reward > best_avg_reward:
+        best_avg_reward = current_avg_reward
+        patience_counter = 0
+    else:
+        patience_counter += 1
+
+    return best_avg_reward, patience_counter
+
 
 def save_reward_plot(metric_dict, path):
     """
     Plot reward from a metric dictionary
-    and save to a file. 
+    and save to a file.
     """
     plt.plot(metric_dict["Total reward"])
     plt.xlabel("Episode")
@@ -72,8 +90,8 @@ def save_reward_plot(metric_dict, path):
     plt.savefig(os.path.join(path, "reward_plot"))
    
 def get_device():
-    """ 
-    Get device to train on. 
+    """
+    Get device to train on.
     """
     # Check if a GPU is available
     if torch.cuda.is_available():
@@ -84,12 +102,12 @@ def get_device():
     else:
         device = torch.device("cpu")
         print("Using CPU")
-    
+
     return device
 
 def find_blocks(table_cells):
     """
-    Function to group tables together 
+    Function to group tables together
     based on their position.
     """
     def get_neighbors(cell):
@@ -116,10 +134,18 @@ def find_blocks(table_cells):
         if cell not in visited:
             dfs(cell, block_id)
             block_id += 1
-    
+
     block_numbers = {cell: block_id for block_id, block_cells in blocks.items() for cell in block_cells}
 
     return block_numbers, block_id-1
+
+def positional_encoding(position, d_model):
+    angle_rates = 1 / np.power(10000, (2 * (np.arange(d_model) // 2)) / np.float32(d_model))
+    angle_rads = position * angle_rates
+    angle_rads[:, 0::2] = np.sin(angle_rads[:, 0::2])  # apply sin to even indices in the array
+    angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])  # apply cos to odd indices in the array
+    return angle_rads
+
 
 def encode_input(env, position, visit_list=None):
     """
@@ -135,6 +161,8 @@ def encode_input(env, position, visit_list=None):
     # Initialize channels
     agent_channel = np.zeros(env.grid.shape)
     visit_list_channel = np.zeros(env.n_tables+1)
+    positions = np.arange(len(visit_list_channel)).reshape(-1, 1)
+    pos_encodings = positional_encoding(positions, 6).flatten()
 
     # Encode the agent's position
     agent_pos = position
@@ -150,5 +178,5 @@ def encode_input(env, position, visit_list=None):
     n_dishes = [np.sum(visit_list_channel)] 
 
     # Combine agent position and visit list to form state
-    state_tensor = np.concatenate((agent_channel, visit_list_channel, n_dishes), axis=0)
+    state_tensor = np.concatenate((agent_pos, visit_list_channel, pos_encodings,  n_dishes), axis=0)
     return state_tensor

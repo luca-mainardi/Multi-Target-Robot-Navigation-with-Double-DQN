@@ -236,10 +236,6 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
         min_epsilon = 0.0001
         decay = 0.95
         init_epsilon = 0.8
-    
-        # Maximum possible steps per episode
-        grid_size = env.grid.shape[0] * env.grid.shape[1]
-        max_steps_per_ep = int(n_plates * (grid_size * 0.1))
 
         agent = QLearningAgent(env, 
                         num_actions=len(range(4)),

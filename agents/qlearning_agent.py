@@ -8,7 +8,7 @@ import itertools, hashlib
 from tqdm import trange
 
 class QLearningAgent(BaseAgent):
-    def __init__(self, env, num_actions, alpha, gamma, epsilon, random_seed, min_epsilon=0.0001, decay=0, capacity=3):
+    def __init__(self, env, num_actions, alpha, gamma, epsilon, random_seed, min_epsilon=0.0001, decay=0, capacity=3, n_tables=3):
         super().__init__()
         self.env = env
         self.num_actions = num_actions
@@ -21,7 +21,7 @@ class QLearningAgent(BaseAgent):
         self.random_seed = random_seed
         self.table_combs = 0
         for i in range(self.env.agent_max_capacity + 1):
-            self.table_combs += len(list(itertools.combinations_with_replacement(range(3), i)))
+            self.table_combs += len(list(itertools.combinations_with_replacement(range(1,n_tables+1), i)))
         self.num_states = env.grid.shape[0] * env.grid.shape[1] * self.table_combs
         self.q_values = np.zeros((self.num_states, num_actions))
         self.algorithm = 'sha256'

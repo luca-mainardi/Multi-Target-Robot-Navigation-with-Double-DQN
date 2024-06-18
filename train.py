@@ -244,7 +244,9 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
                         epsilon=init_epsilon,
                         min_epsilon=min_epsilon,
                         decay=decay,
-                        random_seed=random_seed)  
+                        random_seed=random_seed,
+                        capacity=capacity,
+                        n_tables = env.n_tables)  
 
         # Iterate through training episodes
         for ep in range(train_iter):

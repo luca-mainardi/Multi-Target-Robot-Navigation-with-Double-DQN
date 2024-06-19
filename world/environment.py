@@ -232,13 +232,9 @@ class Environment:
             self.info["agent_moved"] = True
             self.world_stats["total_agent_moves"] += 1
 
-            if cell_value == 3:  # Target Tile
-                self.grid[new_pos] = 0
-                self.info["target_reached"] = True
-                self.world_stats["total_targets_reached"] += 1
-
-            elif cell_value == 5:  # Kitchen Tile
-                self.agent_storage_level = self.agent_max_capacity
+        elif cell_value == 5:  # Kitchen Tile
+            self.agent_storage_level = self.agent_max_capacity
+            
         elif cell_value in [1, 2, 6]:  # Wall, obstacle or table
             self.world_stats["total_failed_moves"] += 1
             self.info["agent_moved"] = False
@@ -249,7 +245,7 @@ class Environment:
 
     def step(
         self, action: int, agent_current_visit_list: list
-    ) -> tuple[np.ndarray, float, bool]:
+        ) -> tuple[np.ndarray, float, bool]:
         """This function makes the agent take a step on the grid.
 
         Action is provided as integer and values are:
@@ -322,7 +318,7 @@ class Environment:
         # Calculate the reward for the agent
         reward = self.reward_fn(new_pos, agent_current_visit_list)
         self._move_agent(new_pos)
-
+            
         self.world_stats["cumulative_reward"] += reward
 
         # GUI specific code
@@ -341,7 +337,7 @@ class Environment:
             )
 
         return self.agent_pos, reward, self.info, table_or_kitchen_number
-
+        
     def _default_reward_fn(self, agent_pos, visit_list) -> float:
         """
         Args:

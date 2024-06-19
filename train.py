@@ -54,10 +54,15 @@ def parse_args():
     p.add_argument("--n_plates", type=int, default=10,
                 help="Total number of plates to deliver per episode.")
     p.add_argument("--trainable", type=bool, default=True,
-                   help="If the agent should continue training or not")
-
+                   help="If the agent should continue training or not.")
     p.add_argument("--capacity", type=int, default=3,
             help="Number of plates an agent can carry at a time.")
+    p.add_argument("--experiment_name", type=str, default=None,
+                   help="Optional experiment name.")
+    p.add_argument("--early_stopping_threshold", type=int, default=100,
+                   help="Optional experiment name.")
+    p.add_argument("--start_epsilon", type=float, default=0.8,
+                   help="Optional experiment name.")
     p.add_argument(
         "--hyperparameter_tuning",
         action="store_true",
@@ -79,7 +84,7 @@ def run_episode(env, agent, max_steps):
     for step in range(max_steps):
         # Agent takes an action based on the latest observation and info.
         action = agent.take_action(state)
-
+        
         # The action is performed in the environment, reward depends on the agent's current visit list 
         next_state, reward, info, table_or_kitchen_number = env.step(action, agent.current_visit_list)
         
@@ -110,7 +115,8 @@ def run_episode(env, agent, max_steps):
     
 def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
          sigma: float, random_seed: int, agent_type: str, load_model_path: Path, 
-         n_plates: int, capacity: int, hyperparameter_tuning: bool = False):
+         n_plates: int, capacity: int, experiment_name: str, 
+         early_stopping_threshold: int, start_epsilon: float, hyperparameter_tuning: bool = False):
     """Main loop of the program."""
     
     # Warnings based on command line arguments given 
@@ -131,13 +137,15 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
     
     # Defines at which training step to reach minimum epsilon
     decay_steps = max_steps_per_ep * train_iter * 0.4
-            
+    
     configs = {
         "agent type": agent_type,
         "grid name": grid.stem,
         "training iterations": train_iter,
         "evaluation iterations": eval_iter,
         "sigma": sigma,
+        "start epsilon": start_epsilon,
+        "early stopping threshold": early_stopping_threshold,
         "random seed": random_seed,
         "n_plates": n_plates,
         "capacity": capacity,
@@ -147,8 +155,7 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
     }
     
     # Create folder to store configs andt training/evaluation results
-    # save_path = make_storage_dir(grid.stem, configs)
-    save_path = ""
+    save_path = make_storage_dir(grid.stem, configs, experiment_name)
 
     if agent_type == "ddqn":
         
@@ -159,7 +166,7 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
         # Train/evaluate the agent
         else:     
             # Initialize agent 
-            agent = DoubleDQNAgent(env, start_epsilon=0.4, end_epsilon=0.01, decay_steps=decay_steps,
+            agent = DoubleDQNAgent(env, start_epsilon=start_epsilon, end_epsilon=0.01, decay_steps=decay_steps,
                                     gamma=0.90, capacity = capacity, device=get_device())
             
             # Load model from path and set training mode to False
@@ -184,23 +191,27 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
                     training_metrics["Epsilon"].append(agent.epsilon)
                     training_metrics["Total reward"].append(total_reward)
                     training_metrics["Loss"].append(avg_loss)
+                    training_metrics["Steps to table"].append(np.mean(agent.steps_to_table))
 
                     # Print metrics every episode
                     for key, value in training_metrics.items():
-                        print(key, value[ep])
+                        if key != "Early stopping episode":
+                            print(key, value[ep])
                     
                     # Save model checkpoint every 100 episodes
                     if ep%100 == 0:
-                        agent.save_model(os.path.join(save_path, f"{grid.stem}_iters_{train_iter}.pth"))
+                        agent.save_model(os.path.join(save_path, "model"))
 
                     best_avg_reward, patience_counter = early_stopping(training_metrics["Total reward"], best_avg_reward,
                                                                                    patience_counter)
                     if patience_counter > 0 and patience_counter % 10 == 0:
                         print("early stopping counter :", patience_counter)
-                    if patience_counter >= 80:
-                        print(f"No improvement in reward for 80 episodes. Stopping training.")
+                    if patience_counter >= early_stopping_threshold:
+                        print(f"No improvement in reward for {early_stopping_threshold} episodes. Stopping training.")
+                        training_metrics["Early stopping episode"] = ep
                         break
                 # Save model and metrics at end of training
+                agent.save_model(os.path.join(save_path, f"model"))
                 save_metrics(save_path, "training_metrics.txt", training_metrics)
                 save_reward_plot(training_metrics, save_path)
                 
@@ -217,13 +228,13 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
                     evaluation_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
                     evaluation_metrics["Wrong table visits"].append(agent.wrong_table_visits)
                     evaluation_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
-                    evaluation_metrics["Epsilon"].append(agent.epsilon)
                     evaluation_metrics["Total reward"].append(total_reward)
- 
+                    evaluation_metrics["Steps to table"].append(np.mean(agent.steps_to_table))
                 # Print metrics
                 print(f"\nAverage metrics: ")
                 for key, value in evaluation_metrics.items():
-                    print(key, np.mean(value))
+                    if key not in ["Epsilon", "Early stopping episode", "Loss"]:
+                        print(key, np.mean(value))
                     
                 # Save metrics 
                 save_metrics(save_path, "evaluation_metrics.txt", evaluation_metrics)
@@ -310,4 +321,4 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
 if __name__ == '__main__':
     args = parse_args()
     main(args.GRID, args.no_gui, args.train_iter, args.eval_iter, args.fps, args.sigma, args.random_seed, args.agent_type, args.load_model_path,
-        args.n_plates, args.capacity, args.hyperparameter_tuning)
+        args.n_plates, args.capacity, args.experiment_name, args.early_stopping_threshold, args.start_epsilon, args.hyperparameter_tuning)

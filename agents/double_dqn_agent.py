@@ -9,7 +9,6 @@ from agents import BaseAgent
 from dqn import DQN
 from .replay_buffer import ReplayBuffer
 from utils import *
-
 class DoubleDQNAgent(BaseAgent):
     """
     A reinforcement learning agent that uses a double deep Q-network. 
@@ -38,7 +37,9 @@ class DoubleDQNAgent(BaseAgent):
         self.episode_visit_list = [] # all tables that the agent must visit in an episode 
         self.current_visit_list = [] # tables that the agent can store in its capacity 
         self.should_train = True
-
+        self.last_delivery_step = 0
+        self.steps_to_table = []
+        
     def set_training_mode(self, train: bool):
         self.should_train = train
         
@@ -70,7 +71,10 @@ class DoubleDQNAgent(BaseAgent):
             if table_or_kitchen_number in self.current_visit_list: # ...when table was in list 
                 n_appearances = self.current_visit_list.count(table_or_kitchen_number) # number of times the table appears in the list
                 self.current_visit_list = [table for table in self.current_visit_list if table != table_or_kitchen_number] # remove table from list 
-                self.correct_table_visits += 1*n_appearances
+                self.correct_table_visits += 1*n_appearances # Increment number of correct table visits
+                self.steps_to_table.append(self.steps_completed-self.last_delivery_step) # Store number of steps taken to reach table
+                self.last_delivery_step=self.steps_completed
+                
                 if len(self.current_visit_list) == 0: # if list is empty after visit, go to kitchen 
                     self.current_visit_list = [0]
             elif table_or_kitchen_number is not None: # visited a wrong table 
@@ -134,17 +138,17 @@ class DoubleDQNAgent(BaseAgent):
         state = torch.tensor(state, device=self.device, dtype=torch.float32)
         rand = random.random()
 
-        # Calculate epsilon for this step
-        epsilon_threshold = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * \
-            math.exp(-1 * self.steps_completed / self.decay_steps)
-        
-        self.epsilon = epsilon_threshold
+        if self.should_train:
+            # Calculate epsilon for this step
+            self.epsilon = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * \
+                math.exp(-1 * self.steps_completed / self.decay_steps)
+        else: self.epsilon = 0.05
 
         # Increment steps completed
         self.steps_completed += 1
 
         # Greedy action calculated by policy net 
-        if rand > self.epsilon or not self.should_train:
+        if rand > self.epsilon:
             with torch.no_grad():
                 return torch.argmax(self.policy_net(state)).item()
 

@@ -5,13 +5,16 @@ import os
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-def make_storage_dir(grid_name, configs):
+def make_storage_dir(grid_name, configs, experiment_name):
     """
     Create directory to store run configs and results.
     """
-    now = datetime.now()
-    current_time = now.strftime("%m-%d_%H:%M:%S")
-    folder_name = f"{grid_name}_{current_time}"
+    if experiment_name:
+        folder_name = experiment_name
+    else:
+        now = datetime.now()
+        current_time = now.strftime("%m-%d_%H:%M:%S")
+        folder_name = f"{grid_name}_{current_time}"
     
     # Define the name of the directory to be created
     parent_dir = "run_result_storage"
@@ -49,6 +52,7 @@ def init_metrics_dict():
         "Plates delivered (%)": [],
         "Total reward": [],
         "Loss": [],
+        "Steps to table": []
     }
     return metrics_dict
 
@@ -139,14 +143,6 @@ def find_blocks(table_cells):
 
     return block_numbers, block_id-1
 
-def positional_encoding(position, d_model):
-    angle_rates = 1 / np.power(10000, (2 * (np.arange(d_model) // 2)) / np.float32(d_model))
-    angle_rads = position * angle_rates
-    angle_rads[:, 0::2] = np.sin(angle_rads[:, 0::2])  # apply sin to even indices in the array
-    angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])  # apply cos to odd indices in the array
-    return angle_rads
-
-
 def encode_input(env, position, visit_list=None):
     """
     Generate input for the DQN model using multi-channel encoding.
@@ -161,8 +157,6 @@ def encode_input(env, position, visit_list=None):
     # Initialize channels
     agent_channel = np.zeros(env.grid.shape)
     visit_list_channel = np.zeros(env.n_tables+1)
-    positions = np.arange(len(visit_list_channel)).reshape(-1, 1)
-    pos_encodings = positional_encoding(positions, 6).flatten()
 
     # Encode the agent's position
     agent_pos = position
@@ -173,10 +167,10 @@ def encode_input(env, position, visit_list=None):
     if visit_list:
         for value in visit_list:
             visit_list_channel[value] += 1 
-    
+        
     # Calculate the number of dishes 
     n_dishes = [np.sum(visit_list_channel)] 
 
     # Combine agent position and visit list to form state
-    state_tensor = np.concatenate((agent_pos, visit_list_channel, pos_encodings,  n_dishes), axis=0)
+    state_tensor = np.concatenate((agent_channel, visit_list_channel, n_dishes), axis=0)
     return state_tensor

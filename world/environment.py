@@ -11,6 +11,7 @@ from warnings import warn
 from time import time, sleep
 from datetime import datetime
 from world.helpers import save_results, action_to_direction
+from agents.qlearning_agent import QLearningAgent
 from utils import *
 
 try:
@@ -437,16 +438,19 @@ class Environment:
             next_state, reward, info, table_or_kitchen_number = env.step(
                 action, agent.current_visit_list
             )
-
-            loss = agent.update(
-                state,
-                info["actual_action"],
-                next_state,
-                reward,
-                episode=0,
-                table_or_kitchen_number=table_or_kitchen_number,
-            )
-            # agent.update_current_visit_list(table_or_kitchen_number)
+            
+            if isinstance(agent, QLearningAgent):
+                agent.update(state, next_state, reward, info["actual_action"], table_or_kitchen_number)
+            else:
+                loss = agent.update(
+                    state,
+                    info["actual_action"],
+                    next_state,
+                    reward,
+                    episode=0,
+                    table_or_kitchen_number=table_or_kitchen_number,
+                )
+                # agent.update_current_visit_list(table_or_kitchen_number)
 
             state = next_state
 

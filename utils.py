@@ -13,7 +13,7 @@ def make_storage_dir(grid_name, configs, experiment_name):
         folder_name = experiment_name
     else:
         now = datetime.now()
-        current_time = now.strftime("%m-%d_%H:%M:%S")
+        current_time = now.strftime("%m-%d_%H-%M-%S")
         folder_name = f"{grid_name}_{current_time}"
     
     # Define the name of the directory to be created

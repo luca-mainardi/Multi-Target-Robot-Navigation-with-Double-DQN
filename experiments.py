@@ -6,8 +6,6 @@ import numpy as np
 import matplotlib.cm as cm
 from agents.double_dqn_agent import DoubleDQNAgent  # Currently being worked on
 import math
-
-# from value_agent_functions import *
 try:
     from world import Environment
     from agents.random_agent import RandomAgent
@@ -16,6 +14,7 @@ except ModuleNotFoundError:
     from os import pardir
     import sys
 
+    #Sets the root path and prepares the environment
     root_path = path.abspath(
         path.join(path.join(path.abspath(__file__), pardir), pardir)
     )
@@ -23,9 +22,9 @@ except ModuleNotFoundError:
         sys.path.extend(root_path)
     from world import Environment
 
-
-# Plots the results of the experiments, unchanged from A1
 def plot_experiment(data, xlabel, ylabel, title):
+    """Plots the results of the experiments"""
+
     plt.figure(figsize=(10, 5))
     plt.plot(data, label=ylabel)
     plt.xlabel(xlabel)
@@ -37,7 +36,7 @@ def plot_experiment(data, xlabel, ylabel, title):
 
 
 def plot_v_matrix(agent, grid_shape, agent_name):
-    """Plot the V matrix as a heatmap."""
+    """Plots the V matrix for the provided agent on the provided grid as a heatmap."""
 
     if agent_name == "DoubleDQNAgent":
         Q = np.array(agent.q_values)
@@ -58,6 +57,9 @@ def plot_v_matrix(agent, grid_shape, agent_name):
 
 
 def hyperparameter_search(env, iters, device):
+    """Tests multiple values of parameters and visualizes the reward function value over training iterations. 
+    The resulting visualizations are saved in the hyperparameters_tuning folder"""
+
     # Define the range of hyperparameters to test
     carrying_capacity = [1, 3, 5]
     epsilon_start_values = [0.1, 0.5, 0.9]
@@ -94,7 +96,6 @@ def hyperparameter_search(env, iters, device):
                     info["actual_action"],
                     next_state,
                     reward,
-                    ep,
                     table_or_kitchen_number,
                 )
                 state = next_state
@@ -240,6 +241,8 @@ def hyperparameter_search(env, iters, device):
 
 
 def plot_all_grid_rewards(all_rewards, grid_paths, xlabel, ylabel, title, iters):
+    """Provides another way to visualize the results of an agent"""
+
     plt.figure(figsize=(10, 5))
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)

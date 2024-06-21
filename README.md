@@ -1,109 +1,121 @@
-# DIC-2AMC15-2024
 
-Welcome to Data Intelligence Challenge-2AMC15!
-This is the repository containing the challenge environment code.
+# Reinforcement Learning Assignment 2
 
-## Quickstart
+This project involves the development and evaluation of a reinforcement learning-based autonomous delivery robot functioning as a waiter in a restaurant setting. The robot's tasks include picking up plates from the kitchen, navigating the restaurant environment, and delivering food to designated tables. This project builds on the previous assignment, incorporating more complex environments and advanced RL techniques.
 
-1. Create a virtual environment for this course with Python >= 3.10. Using conda, you can do: `conda create -n dic2024 python=3.11`. Use `conda activate dic2024` to activate it `conda deactivate` to deactivate it.
-2. Clone this repository into the local directory you prefer `git clone https://github.com/dianaonutu/DIC-2AMC15-2024.git`.
-3. Install the required packages `pip install -r requirements.txt`. Now, you are ready to use the simulation environment! :partying_face:	
-4. Run `$ python train.py grid_configs/grid_example.grd` to start training!
+<div style="text-align: center;">
+    <img src="restA_floorplan.png" alt="Restaurant Floor Plan" width="200" style="display: inline-block; margin-right: 20px;"/>
+    <img src="restA_grid.png" alt="Restaurant Grid" width="200" style="display: inline-block;"/>
+</div>
+## Project Structure
 
-`train.py` is just an example training script. Inside this file, initialize the agent you want to train and evaluate. Feel free to modify it as necessary. Its usage is:
+```
+├── agents/
+│   ├── ddqn_agent.py
+│   ├── q_learning_agent.py
+├── grid_configs/
+│   ├── example_grid.npy
+│   ├── restA_1r.npy
+│   ├── restA_2r.npy
+├── world/
+│   ├── __init__.py
+│   ├── environment.py
+│   ├── grid.py
+│   ├── grid_creator.py
+│   ├── gui.py
+│   ├── helpers.py
+│   ├── path_visualizer.py
+│   ├── static/
+│   ├── templates/
+├── train.py
+├── requirements.txt
+├── utils.py
+├── dqn.py
+└── README.md
 
-```bash
-usage: train.py [-h] [--no_gui] [--sigma SIGMA] [--fps FPS] [--iter ITER]
-                [--random_seed RANDOM_SEED] 
-                GRID [GRID ...]
-
-DIC Reinforcement Learning Trainer.
-
-positional arguments:
-  GRID                  Paths to the grid file to use. There can be more than
-                        one.
-options:
-  -h, --help                 show this help message and exit
-  --no_gui                   Disables rendering to train faster (boolean)
-  --sigma SIGMA              Sigma value for the stochasticity of the environment. (float, default=0.1, should be in [0, 1])
-  --fps FPS                  Frames per second to render at. Only used if no_gui is not set. (int, default=30)
-  --iter ITER                Number of iterations to go through. Should be integer. (int, default=1000)
-  --random_seed RANDOM_SEED  Random seed value for the environment. (int, default=0)
 ```
 
-## Code guide
+## Setup
+ 
+1. **Install the dependencies**:
+    ```sh
+    pip install -r requirements.txt
+    ```
 
-The code is made up of 2 modules: 
+## Usage
 
-1. `agent`
-2. `world`
+To train the reinforcement learning agents, use the `train.py` script. This script requires certain arguments to specify the agent type, grid configuration, and other parameters.
 
-### The `agent` module
+### Running the Training Script
 
-The `agent` module contains the `BaseAgent` class as well as some benchmark agents you may want to test against.
-
-The `BaseAgent` is an abstract class and all RL agents for DIC must inherit from/implement it.
-If you know/understand class inheritence, skip the following section:
-
-#### `BaseAgent` as an abstract class
-Here you can find an explanation about abstract classes [Geeks for Geeks](https://www.geeksforgeeks.org/abstract-classes-in-python/).
-
-Think of this like how all models in PyTorch start like 
-
-```python
-class NewModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-    ...
+```sh
+python train.py <grid_config> --agent <agent_type> [other_options]
 ```
 
-In this case, `NewModel` inherits from `nn.Module`, which gives it the ability to do back propagation, store parameters, etc. without you having to manually code that every time.
-It also ensures that every class that inherits from `nn.Module` contains _at least_ the `forward()` method, which allows a forward pass to actually happen.
+### Command-Line Options
 
-In the case of your RL agent, inheriting from `BaseAgent` guarantees that your agent implements `update()` and `take_action()`.
-This ensures that no matter what RL agent you make and however you code it, the environment and training code can always interact with it in the same way.
-Check out the benchmark agents to see examples.
+- `--agent_type`: Specify the type of agent to train (default `ddqn`)(`ddqn`, `qlearning`).
+- `GRID`: Paths to the grid file to use. There can be more than one. (e.g., `grid_configs/restaurant_single_room.npy`).
+- `--no_gui`: Disables rendering to train faster.
+- `--sigma`: Sigma value for the stochasticity of the environment (default 0.1).
+- `--fps`: Frames per second to render at. Only used if no_gui is not set (default 30).
+- `--random_seed`: Random seed value for the environment (default 0).
+- `--train_iter`: Number of training iterations to go through(default 1000).
+- `--eval_iter`: Number of evaluation iterations to go through(default 0.1).
+- `--load_model_path`: Path to a pre-trained model to load.
+- `--trainable`: If the agent should continue training or not(default True).
+- `--capacity`: Number of plates an agent can carry at a time(default 3).
+- `--experiment_name`: Optional experiment name(default None)().
+- `--early_stopping_threshold`: Number of iterations needed to stop after no improvement observed.(default 100).
+- `--start_epsilon`: Initial value for epsilon.(default 0.8).
+- `--hyperparameter_tuning`: If set, perform a hyperparameter tuning.
 
-### The `world` module
 
-The world module contains:
-1. `grid_creator.py`
-2. `environment.py`
-3. `grid.py`
-4. `gui.py`
 
-#### Grid creator
-Run this file to create new grids.
+### Example
 
-```bash
-$ python grid_creator.py
+```sh
+python train.py grid_configs/restA_1r.npy --train_iter 100 --n_plates 7 --fps 30 --sigma 0.1 --eval_iter 10 --random_seed 5 --agent_type ddqn --start_epsilon 0.7
 ```
 
-This will start up a web server where you create new grids, of different sizes with various elements arrangements.
-To view the grid creator itself, go to `127.0.0.1:5000`.
-All levels will be saved to the `grid_configs/` directory.
+## File Descriptions
+
+- **agents/**: Contains the implementation of different RL agents.
+  - `ddqn_agent.py`: Implementation of the Double Deep Q-Learning agent.
+  - `q_learning_agent.py`: Implementation of the Q-Learning agent.
+- **grid_configs/**: Various grid configuration files used for training and testing the agents.
+- **world/**: Contains the environment setup and helper functions for running the simulations.
+  - `environment.py`: Defines the environment in which the agents operate.
+  - `grid.py`: Manages grid configurations and operations.
+  - `grid_creator.py`: Utility for creating new grid configurations.
+  - `gui.py`: Handles the graphical user interface for visualizing the environment.
+  - `helpers.py`: Helper functions used across the project.
+  - `path_visualizer.py`: Visualizes the paths taken by the agents.
+- `utils.py`: Contains utility functions used across the project.
+- `dqn.py`: Implementation of Deep Q-Network specific functionalities.
+- `train.py`: Script to train the reinforcement learning agents.
+
+## Environment Design
+
+The environment is modeled as a grid-based representation of a restaurant, comprising walls, floors, tables, and the kitchen. The robot must navigate this environment to perform its tasks efficiently. The grid can be adjusted to simulate different restaurant layouts, including single-room and dual-room scenarios connected by a door.
 
 
-#### The Environment
+## Conclusion
 
-The `Environment` is very important because it contains everything we hold dear, including ourselves [^1].
-It is also the name of the class which our RL agent will act within. Most of the action happens in there.
+In this project, we designed and evaluated an autonomous delivery robot using reinforcement learning techniques. We implemented both Q-Learning and Double Deep Q-Learning (DDQN) agents and tested their performance in various restaurant environments. Our results demonstrated that the DDQN agent significantly outperformed the Q-Learning agent, particularly in complex environments.
 
-The main interaction with `Environment` is through the methods:
+## Future Work
 
-- `Environment()` to initialize the environment
-- `reset()` to reset the environment
-- `step()` to actually take a time step with the environment
-- `Environment().evaluate_agent()` to evaluate the agent after training.
+- Experiment with more complex environments.
+- Integrate battery management for autonomous recharging.
+- Investigate multi-agent coordination.
+- Explore direct customer delivery scenarios.
 
-[^1]: In case you missed it, this sentence is a joke. Please do not write all your code in the `Environment` class.
+## References
 
-#### The Grid
+- A. Faust et al., "Automated aerial suspended cargo delivery through reinforcement learning," Artificial Intelligence, 2017.
+- M. Hossain, "Autonomous delivery robots: A literature review," IEEE Engineering Management Review, 2023.
+- H. Jahanshahi et al., "A deep reinforcement learning approach for the meal delivery problem," Knowledge-Based Systems, 2022.
+- Y. Li, "Deep reinforcement learning: An overview," arXiv preprint arXiv:1701.07274, 2017.
 
-The `Grid` class is the the actual representation of the world on which the agent moves. It is a 2D Numpy array.
-
-#### The GUI
-
-The Graphical User Interface provides a way for you to actually see what the RL agent is doing.
-While performant and written using PyGame, it is still about 1300x slower than not running a GUI.
-Because of this, we recommend using it only while testing/debugging and not while training.
+---

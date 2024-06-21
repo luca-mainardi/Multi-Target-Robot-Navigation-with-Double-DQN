@@ -143,6 +143,15 @@ def find_blocks(table_cells):
 
     return block_numbers, block_id-1
 
+
+def positional_encoding(position, d_model):
+    angle_rates = 1 / np.power(10000, (2 * (np.arange(d_model) // 2)) / np.float32(d_model))
+    angle_rads = position * angle_rates
+    angle_rads[:, 0::2] = np.sin(angle_rads[:, 0::2])  # apply sin to even indices
+    angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])  # apply cos to odd indices
+    return angle_rads
+
+
 def encode_input(env, position, visit_list=None):
     """
     Generate input for the DQN model using multi-channel encoding.
@@ -156,14 +165,23 @@ def encode_input(env, position, visit_list=None):
     """
     # Initialize channels
     agent_channel = np.zeros(env.grid.shape)
-    visit_list_channel = np.zeros(env.n_tables+1)
+    visit_list_channel = np.zeros(env.n_tables + 1)
+
+    if visit_list is None:
+        visit_list = []
+
+    for value in visit_list:
+        visit_list_channel[value] += 1
+
+    # Positional encoding for visit list
+    visit_list_indices = np.arange(len(visit_list_channel)).reshape(-1, 1)
+    # pos_encodings = positional_encoding(visit_list_indices, 6).flatten()
 
     # Encode the agent's position
-    agent_pos = position
-    agent_channel[agent_pos[0], agent_pos[1]] = 1
+    agent_channel[position[0], position[1]] = 1
     agent_channel = agent_channel.flatten()
 
-    # Encode the visit list 
+    # Encode the visit list
     if visit_list:
         for value in visit_list:
             visit_list_channel[value] += 1 
@@ -172,5 +190,7 @@ def encode_input(env, position, visit_list=None):
     n_dishes = [np.sum(visit_list_channel)] 
 
     # Combine agent position and visit list to form state
-    state_tensor = np.concatenate((agent_channel, visit_list_channel, n_dishes), axis=0)
+    state_tensor = np.concatenate((position, visit_list_channel, n_dishes), axis=0)
+
+    # state_tensor = np.concatenate((position, visit_list_channel, pos_encodings, n_dishes), axis=0)
     return state_tensor

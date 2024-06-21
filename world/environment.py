@@ -25,9 +25,7 @@ except ModuleNotFoundError:
     from os import pardir
     import sys
 
-    root_path = path.abspath(
-        path.join(path.join(path.abspath(__file__), pardir), pardir)
-    )
+    root_path = path.abspath(path.join(path.join(path.abspath(__file__), pardir), pardir))
 
     if root_path not in sys.path:
         sys.path.append(root_path)
@@ -152,10 +150,7 @@ class Environment:
                 # Cell is empty. We can place the agent there.
                 self.agent_pos = pos
             else:
-                raise ValueError(
-                    "Attempted to place agent on top of obstacle, delivery"
-                    "location or charger"
-                )
+                raise ValueError("Attempted to place agent on top of obstacle, delivery" "location or charger")
         else:
             # No positions were given. We place agents randomly.
             # warn(
@@ -163,12 +158,12 @@ class Environment:
             #     "on the grid."
             # )
             # Find all empty locations and choose one at random
-                
+
             zeros = np.where(self.grid == 0)
             while True:
                 idx = random.randint(0, len(zeros[0]) - 1)
                 self.agent_pos = (zeros[0][idx], zeros[1][idx])
-                if self.agent_pos[0] not in range(0,9) or self.agent_pos[1] not in range(9, 18):
+                if self.agent_pos[0] not in range(0, 9) or self.agent_pos[1] not in range(9, 18):
                     break
             # print("POSITION ", self.agent_pos)
 
@@ -196,9 +191,7 @@ class Environment:
                 case "target_fps":
                     self.target_spf = 1.0 / v
                 case _:
-                    raise ValueError(
-                        f"{k} is not one of the possible " f"keyword arguments."
-                    )
+                    raise ValueError(f"{k} is not one of the possible " f"keyword arguments.")
 
         # Reset variables
         self.grid = Grid.load_grid(self.grid_fp).cells
@@ -234,18 +227,14 @@ class Environment:
 
         elif cell_value == 5:  # Kitchen Tile
             self.agent_storage_level = self.agent_max_capacity
-            
+
         elif cell_value in [1, 2, 6]:  # Wall, obstacle or table
             self.world_stats["total_failed_moves"] += 1
             self.info["agent_moved"] = False
         else:
-            raise ValueError(
-                f"Grid is badly formed. It has a value of {self.grid[new_pos]} at position {new_pos}."
-            )
+            raise ValueError(f"Grid is badly formed. It has a value of {self.grid[new_pos]} at position {new_pos}.")
 
-    def step(
-        self, action: int, agent_current_visit_list: list
-        ) -> tuple[np.ndarray, float, bool]:
+    def step(self, action: int, agent_current_visit_list: list) -> tuple[np.ndarray, float, bool]:
         """This function makes the agent take a step on the grid.
 
         Action is provided as integer and values are:
@@ -318,7 +307,7 @@ class Environment:
         # Calculate the reward for the agent
         reward = self.reward_fn(new_pos, agent_current_visit_list)
         self._move_agent(new_pos)
-            
+
         self.world_stats["cumulative_reward"] += reward
 
         # GUI specific code
@@ -337,7 +326,7 @@ class Environment:
             )
 
         return self.agent_pos, reward, self.info, table_or_kitchen_number
-        
+
     def _default_reward_fn(self, agent_pos, visit_list) -> float:
         """
         Args:
@@ -362,9 +351,7 @@ class Environment:
             case 6:  # table
                 table_number = self.table_number_mapping[agent_pos]
                 if table_number in visit_list:
-                    count = visit_list.count(
-                        table_number
-                    )  # number of times table appears in visit list
+                    count = visit_list.count(table_number)  # number of times table appears in visit list
                     reward = count * 10  # correct table
                 else:
                     reward = -5  # wrong table
@@ -431,10 +418,8 @@ class Environment:
 
             action = agent.take_action(state, evaluation=True)
 
-            next_state, reward, info, table_or_kitchen_number = env.step(
-                action, agent.current_visit_list
-            )
-            
+            next_state, reward, info, table_or_kitchen_number = env.step(action, agent.current_visit_list)
+
             if isinstance(agent, QLearningAgent):
                 agent.update(state, next_state, reward, info["actual_action"], table_or_kitchen_number)
             else:

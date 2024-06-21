@@ -1,9 +1,10 @@
 from collections import defaultdict
 import numpy as np
 import torch
-import os 
+import os
 from datetime import datetime
 import matplotlib.pyplot as plt
+
 
 def make_storage_dir(grid_name, configs, experiment_name):
     """
@@ -15,7 +16,7 @@ def make_storage_dir(grid_name, configs, experiment_name):
         now = datetime.now()
         current_time = now.strftime("%m-%d_%H-%M-%S")
         folder_name = f"{grid_name}_{current_time}"
-    
+
     # Define the name of the directory to be created
     parent_dir = "run_result_storage"
 
@@ -31,17 +32,18 @@ def make_storage_dir(grid_name, configs, experiment_name):
     if not os.path.exists(sub_dir_path):
         os.makedirs(sub_dir_path)
         print(f"Subdirectory '{folder_name}' created inside '{parent_dir}'")
-    
+
     # Save dictionary to a text file
-    with open(os.path.join(parent_dir, folder_name, "configs.txt"), 'w') as file:
+    with open(os.path.join(parent_dir, folder_name, "configs.txt"), "w") as file:
         for key, value in configs.items():
-            file.write(f'{key}: {value}\n')
+            file.write(f"{key}: {value}\n")
 
     return sub_dir_path
 
+
 def init_metrics_dict():
     """
-    Initialize a dictionary to 
+    Initialize a dictionary to
     store agent evaluation metrics.
     """
     metrics_dict = {
@@ -52,7 +54,7 @@ def init_metrics_dict():
         "Plates delivered (%)": [],
         "Total reward": [],
         "Loss": [],
-        "Steps to table": []
+        "Steps to table": [],
     }
     return metrics_dict
 
@@ -61,16 +63,20 @@ def save_metrics(path, file_name, metric_dict):
     """
     Save a metric dictionary to a file.
     """
-    with open(os.path.join(path, file_name), 'w') as file:
+    with open(os.path.join(path, file_name), "w") as file:
         for key, value in metric_dict.items():
-            file.write(f'{key}: {value}\n')
+            file.write(f"{key}: {value}\n")
     print(f"\nCreated {file_name} file")
 
 
 def early_stopping(cumulative_rewards, best_avg_reward, patience_counter):
-    """Update the best average reward and check if we should stop training."""
+    """
+    Update the best average reward and check
+    if we should stop training.
+    """
+    # Not enough episodes to compute average yet
     if len(cumulative_rewards) < 20:
-        return best_avg_reward, 0  # Not enough episodes to compute average yet
+        return best_avg_reward, 0
 
     current_avg_reward = np.mean(cumulative_rewards[-20:])
 
@@ -92,7 +98,8 @@ def save_reward_plot(metric_dict, path):
     plt.xlabel("Episode")
     plt.ylabel("Total reward")
     plt.savefig(os.path.join(path, "reward_plot"))
-   
+
+
 def get_device():
     """
     Get device to train on.
@@ -109,11 +116,13 @@ def get_device():
 
     return device
 
+
 def find_blocks(table_cells):
     """
     Function to group tables together
     based on their position.
     """
+
     def get_neighbors(cell):
         x, y = cell
         return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
@@ -132,7 +141,7 @@ def find_blocks(table_cells):
     cell_set = set(table_cells)
     visited = set()
     blocks = defaultdict(list)
-    block_id = 1 # ensure that tables are numbered starting from 1, since 0 represents the kitchen
+    block_id = 1  # ensure that tables are numbered starting from 1, since 0 represents the kitchen
 
     for cell in table_cells:
         if cell not in visited:
@@ -141,7 +150,7 @@ def find_blocks(table_cells):
 
     block_numbers = {cell: block_id for block_id, block_cells in blocks.items() for cell in block_cells}
 
-    return block_numbers, block_id-1
+    return block_numbers, block_id - 1
 
 
 def positional_encoding(position, d_model):
@@ -154,14 +163,8 @@ def positional_encoding(position, d_model):
 
 def encode_input(env, position, visit_list=None):
     """
-    Generate input for the DQN model using multi-channel encoding.
-
-    Args:
-        env: The environment object containing the agent's position and target positions.
-        position: The agent's current position as a tuple (position).
-        visit_list: The agent's current list of tables to visit 
-    Returns:
-        np.ndarray: The generated input feature vector.
+    Generate input for the DDQN model by encoding the
+    agent's position and current visit list.
     """
     # Initialize channels
     agent_channel = np.zeros(env.grid.shape)
@@ -173,10 +176,6 @@ def encode_input(env, position, visit_list=None):
     for value in visit_list:
         visit_list_channel[value] += 1
 
-    # Positional encoding for visit list
-    visit_list_indices = np.arange(len(visit_list_channel)).reshape(-1, 1)
-    # pos_encodings = positional_encoding(visit_list_indices, 6).flatten()
-
     # Encode the agent's position
     agent_channel[position[0], position[1]] = 1
     agent_channel = agent_channel.flatten()
@@ -184,13 +183,13 @@ def encode_input(env, position, visit_list=None):
     # Encode the visit list
     if visit_list:
         for value in visit_list:
-            visit_list_channel[value] += 1 
-        
-    # Calculate the number of dishes 
-    n_dishes = [np.sum(visit_list_channel)] 
+            visit_list_channel[value] += 1
+
+    # Calculate the number of dishes
+    n_dishes = [np.sum(visit_list_channel)]
 
     # Combine agent position and visit list to form state
-    state_tensor = np.concatenate((position, visit_list_channel, n_dishes), axis=0)
+    state_tensor = np.concatenate((agent_channel, visit_list_channel, n_dishes), axis=0)
 
     # state_tensor = np.concatenate((position, visit_list_channel, pos_encodings, n_dishes), axis=0)
     return state_tensor

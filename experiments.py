@@ -1,26 +1,24 @@
 import matplotlib.pyplot as plt
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import numpy as np
 import matplotlib.cm as cm
 from agents.double_dqn_agent import DoubleDQNAgent  # Currently being worked on
-import math
+import ast
+
 try:
     from world import Environment
-    from agents.random_agent import RandomAgent
 except ModuleNotFoundError:
     from os import path
     from os import pardir
     import sys
 
-    #Sets the root path and prepares the environment
+    # Sets the root path and prepares the environment
     root_path = path.abspath(
         path.join(path.join(path.abspath(__file__), pardir), pardir)
     )
     if root_path not in sys.path:
         sys.path.extend(root_path)
     from world import Environment
+
 
 def plot_experiment(data, xlabel, ylabel, title):
     """Plots the results of the experiments"""
@@ -57,7 +55,7 @@ def plot_v_matrix(agent, grid_shape, agent_name):
 
 
 def hyperparameter_search(env, iters, device):
-    """Tests multiple values of parameters and visualizes the reward function value over training iterations. 
+    """Tests multiple values of parameters and visualizes the reward function value over training iterations.
     The resulting visualizations are saved in the hyperparameters_tuning folder"""
 
     # Define the range of hyperparameters to test
@@ -255,5 +253,52 @@ def plot_all_grid_rewards(all_rewards, grid_paths, xlabel, ylabel, title, iters)
         grid_name = str(grid).split("/")[1].split(".")[0]
         plt.plot(x_vals, rewards, label=grid_name)
 
+    plt.legend()
+    plt.show()
+
+
+def text_to_dict(file_path):
+    """
+    Helper function to convert a saved
+    metrics dict from .txt to dict.
+    """
+    dictionary = {}
+    with open(file_path, "r") as file:
+        lines = file.readlines()
+
+    for line in lines:
+        if line.strip():  # Skip empty lines
+            key, values = line.split(":", 1)  # Split only on the first colon
+            key = key.strip()
+            values = values.strip()
+
+            # Evaluate the string representation of the list or handle single integers
+            try:
+                if values.startswith("[") and values.endswith("]"):
+                    value_list = ast.literal_eval(values)
+                    if isinstance(value_list, list):
+                        dictionary[key] = value_list
+                    else:
+                        raise ValueError("Parsed value is not a list")
+                else:
+                    dictionary[key] = int(values)
+            except ValueError:
+                pass
+            except Exception as e:
+                pass
+
+    return dictionary
+
+
+def plot_grid_comparison_train(dict1_path, dict2_path, labels):
+    """
+    Plot reward of two agents.
+    """
+    metrics_1 = text_to_dict(dict1_path)
+    metrics_2 = text_to_dict(dict2_path)
+    plt.plot(metrics_1["Total reward"], label=labels[0])
+    plt.plot(metrics_2["Total reward"], label=labels[1])
+    plt.xlabel("Episode")
+    plt.ylabel("Reward")
     plt.legend()
     plt.show()

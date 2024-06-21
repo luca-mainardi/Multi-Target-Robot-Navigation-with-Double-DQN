@@ -43,7 +43,7 @@ def parse_args():
                         "no_gui is not set.")
     p.add_argument("--train_iter", type=int, default=1000,
                    help="Number of training iterations to go through.")
-    p.add_argument("--eval_iter", type=int, default=100,
+    p.add_argument("--eval_iter", type=int, default=10,
                    help="Number of evaluation iterations to go through.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
@@ -60,9 +60,9 @@ def parse_args():
     p.add_argument("--experiment_name", type=str, default=None,
                    help="Optional experiment name.")
     p.add_argument("--early_stopping_threshold", type=int, default=100,
-                   help="Optional experiment name.")
+                   help="Number of iterations needed to stop after no improvement observed.")
     p.add_argument("--start_epsilon", type=float, default=0.8,
-                   help="Optional experiment name.")
+                   help="Initial value or epsilon.")
     p.add_argument(
         "--hyperparameter_tuning",
         action="store_true",
@@ -168,7 +168,7 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
             # Initialize agent 
             agent = DoubleDQNAgent(env, start_epsilon=start_epsilon, end_epsilon=0.01, decay_steps=decay_steps,
                                     gamma=0.90, capacity = capacity, device=get_device())
-            
+
             # Load model from path and set training mode to False
             if load_model_path:
                 agent.load_model(load_model_path)
@@ -204,11 +204,11 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
 
                     best_avg_reward, patience_counter = early_stopping(training_metrics["Total reward"], best_avg_reward,
                                                                                    patience_counter)
-                    if patience_counter > 0 and patience_counter % 10 == 0:
-                        print("early stopping counter :", patience_counter)
                     if patience_counter >= early_stopping_threshold:
                         print(f"No improvement in reward for {early_stopping_threshold} episodes. Stopping training.")
                         training_metrics["Early stopping episode"] = ep
+                    if patience_counter >= 100:
+                        print(f"No improvement in reward for 80 episodes. Stopping training.")
                         break
                 # Save model and metrics at end of training
                 agent.save_model(os.path.join(save_path, f"model"))
@@ -263,13 +263,16 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
         for ep in range(train_iter):
             print(f"\nEpisode {ep}")
             n_steps, total_reward, avg_loss, _ = run_episode(env, agent, max_steps_per_ep)
-            
+            # Update epsilon
+            if ep %  ((eval_iter * 2/3) / 20) == 0:
+                agent.update_epsilon()
             training_metrics["Steps taken"].append(n_steps)
             training_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
             training_metrics["Wrong table visits"].append(agent.wrong_table_visits)
             training_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
             training_metrics["Epsilon"].append(agent.epsilon)
             training_metrics["Total reward"].append(total_reward)
+            training_metrics["Steps to table"].append(np.mean(agent.steps_to_table))
 
             # Print metrics every episode
             for key, value in training_metrics.items():
@@ -299,15 +302,14 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
             # Iterate through evaluation episodes 
             for ep in trange(eval_iter):
                 n_steps, total_reward, _, _ = run_episode(env, agent, max_steps_per_ep)
-                # Update epsilon
-                if ep %  ((eval_iter * 2/3) / 20) == 0:
-                    agent.update_epsilon()
                 evaluation_metrics["Steps taken"].append(n_steps)
                 evaluation_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
                 evaluation_metrics["Wrong table visits"].append(agent.wrong_table_visits)
                 evaluation_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
                 evaluation_metrics["Epsilon"].append(agent.epsilon)
                 evaluation_metrics["Total reward"].append(total_reward)
+                evaluation_metrics["Steps to table"].append(np.mean(agent.steps_to_table))
+
 
             # Print metrics
             print(f"\nAverage metrics: ")

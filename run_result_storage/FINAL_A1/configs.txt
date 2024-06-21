@@ -1,0 +1,13 @@
+agent type: ddqn
+grid name: restA_1r
+training iterations: 1000
+evaluation iterations: 200
+sigma: 0.0
+start epsilon: 0.4
+early stopping threshold: 100
+random seed: 0
+n_plates: 10
+capacity: 3
+max steps per episode: 532
+decay_steps: 212800.0
+load model path: None

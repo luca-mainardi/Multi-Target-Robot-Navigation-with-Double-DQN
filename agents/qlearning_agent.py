@@ -31,6 +31,10 @@ class QLearningAgent(BaseAgent):
         self.wrong_table_visits = 0
         self.visits_to_kitchen = 0
         self.correct_table_visits = 0
+        self.last_delivery_step = 0
+        self.steps_to_table = []
+        self.steps_completed = 0
+
 
     
     def visited_all_tables(self):
@@ -48,10 +52,9 @@ class QLearningAgent(BaseAgent):
     def update_current_visit_list(self, table_or_kitchen_number):
         if table_or_kitchen_number == 0: # visited kitchen...
             if self.current_visit_list == [0]: # ...when kitchen was the goal: then remove the 0, refill list 
-                self.current_visit_list = self.episode_visit_list[0:self.capacity] 
+                self.current_visit_list = self.current_visit_list = self.episode_visit_list[0:self.capacity] 
                 self.episode_visit_list = self.episode_visit_list[self.capacity:]  
                 self.visits_to_kitchen += 1
-
             elif len(self.current_visit_list) < self.capacity: # ...with space for more plates: then calculate space, refill list 
                 remaining_capacity = self.capacity - len(self.current_visit_list)  
                 self.current_visit_list += self.episode_visit_list[0:remaining_capacity]
@@ -60,8 +63,12 @@ class QLearningAgent(BaseAgent):
 
         if table_or_kitchen_number != 0: # visited table... 
             if table_or_kitchen_number in self.current_visit_list: # ...when table was in list 
+                n_appearances = self.current_visit_list.count(table_or_kitchen_number) # number of times the table appears in the list
                 self.current_visit_list = [table for table in self.current_visit_list if table != table_or_kitchen_number] # remove table from list 
-                self.correct_table_visits += 1
+                self.correct_table_visits += 1*n_appearances # Increment number of correct table visits
+                self.steps_to_table.append(self.steps_completed-self.last_delivery_step) # Store number of steps taken to reach table
+                self.last_delivery_step=self.steps_completed
+                
                 if len(self.current_visit_list) == 0: # if list is empty after visit, go to kitchen 
                     self.current_visit_list = [0]
             elif table_or_kitchen_number is not None: # visited a wrong table 
@@ -99,6 +106,8 @@ class QLearningAgent(BaseAgent):
 
     def take_action(self, state, **kwargs):
         """Take a random action or the best action based on exploration-exploitation parameter epsilon"""
+         # Increment steps completed
+        self.steps_completed += 1
         if np.random.rand() < self.epsilon:
             # Perform an action with the aim of exploration
             return np.random.choice(range(self.num_actions))

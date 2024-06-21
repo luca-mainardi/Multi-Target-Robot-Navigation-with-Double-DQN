@@ -263,13 +263,16 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
         for ep in range(train_iter):
             print(f"\nEpisode {ep}")
             n_steps, total_reward, avg_loss, _ = run_episode(env, agent, max_steps_per_ep)
-            
+            # Update epsilon
+            if ep %  ((eval_iter * 2/3) / 20) == 0:
+                agent.update_epsilon()
             training_metrics["Steps taken"].append(n_steps)
             training_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
             training_metrics["Wrong table visits"].append(agent.wrong_table_visits)
             training_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
             training_metrics["Epsilon"].append(agent.epsilon)
             training_metrics["Total reward"].append(total_reward)
+            training_metrics["Steps to table"].append(np.mean(agent.steps_to_table))
 
             # Print metrics every episode
             for key, value in training_metrics.items():
@@ -299,15 +302,14 @@ def main(grid: Path, no_gui: bool, train_iter: int, eval_iter: int, fps: int,
             # Iterate through evaluation episodes 
             for ep in trange(eval_iter):
                 n_steps, total_reward, _, _ = run_episode(env, agent, max_steps_per_ep)
-                # Update epsilon
-                if ep %  ((eval_iter * 2/3) / 20) == 0:
-                    agent.update_epsilon()
                 evaluation_metrics["Steps taken"].append(n_steps)
                 evaluation_metrics["Kitchen visits"].append(agent.visits_to_kitchen)
                 evaluation_metrics["Wrong table visits"].append(agent.wrong_table_visits)
                 evaluation_metrics["Plates delivered (%)"].append((agent.correct_table_visits/n_plates)*100)
                 evaluation_metrics["Epsilon"].append(agent.epsilon)
                 evaluation_metrics["Total reward"].append(total_reward)
+                evaluation_metrics["Steps to table"].append(np.mean(agent.steps_to_table))
+
 
             # Print metrics
             print(f"\nAverage metrics: ")

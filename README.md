@@ -1,4 +1,3 @@
-
 # Reinforcement Learning Assignment 2
 
 This project involves the development and evaluation of a reinforcement learning-based autonomous delivery robot functioning as a waiter in a restaurant setting. The robot's tasks include picking up plates from the kitchen, navigating the restaurant environment, and delivering food to designated tables. This project builds on the previous assignment, incorporating more complex environments and advanced RL techniques.
@@ -36,11 +35,11 @@ This project involves the development and evaluation of a reinforcement learning
 ```
 
 ## Setup
- 
+
 1. **Install the dependencies**:
-    ```sh
-    pip install -r requirements.txt
-    ```
+   ```sh
+   pip install -r requirements.txt
+   ```
 
 ## Usage
 
@@ -70,8 +69,6 @@ python train.py <grid_config> --agent <agent_type> [other_options]
 - `--start_epsilon`: Initial value for epsilon.(default 0.8).
 - `--hyperparameter_tuning`: If set, perform a hyperparameter tuning.
 
-
-
 ### Example
 
 ```sh
@@ -99,6 +96,58 @@ python train.py grid_configs/restA_1r.npy --train_iter 100 --n_plates 7 --fps 30
 
 The environment is modeled as a grid-based representation of a restaurant, comprising walls, floors, tables, and the kitchen. The robot must navigate this environment to perform its tasks efficiently. The grid can be adjusted to simulate different restaurant layouts, including single-room and dual-room scenarios connected by a door.
 
+## Experiment commands
+
+- Hyperparameter tuning (warning, takes 2 hours to run)
+
+```sh
+python train.py grid_configs/restA_1r.npy --hyperparameter_tuning --no_gui
+```
+
+- Grid comparison
+  1-room agent:
+
+```sh
+python train.py grid_configs/restA_1r.npy --train_iter 1000 --n_plates 9 --capacity 3 --eval_iter 100 --agent_type ddqn --start_epsilon 0.4 --early_stopping_threshold 100 --no_gui
+```
+
+2-room agent
+
+```sh
+python train.py grid_configs/restA_2r.npy --train_iter 1300 --n_plates 9 --capacity 3 --eval_iter 100 --agent_type ddqn --start_epsilon 0.5 --early_stopping_threshold 200 --no_gui
+```
+
+- Q-learning vs DDQN
+  1-room agent
+
+```sh
+python train.py grid_configs/restA_1r.npy --train_iter 1000 --n_plates 9 --capacity 3 --eval_iter 100 --agent_type qlearning --start_epsilon 0.8 --early_stopping_threshold 100 --no_gui
+```
+
+2-room agent
+
+```sh
+python train.py grid_configs/restA_1r.npy --train_iter 1000 --n_plates 9 --capacity 3 --eval_iter 100 --agent_type qlearning --start_epsilon 0.8 --early_stopping_threshold 200 --no_gui
+```
+
+- Varying agent capacity
+  Capacity = 1
+
+```sh
+python train.py grid_configs/restA_1r.npy --train_iter 1000 --n_plates 9 --capacity 1 --eval_iter 100 --agent_type ddqn --start_epsilon 0.5 --early_stopping_threshold 100 --no_gui
+```
+
+Capacity = 3
+
+```sh
+python train.py grid_configs/restA_1r.npy --train_iter 1000 --n_plates 9 --capacity 3 --eval_iter 100 --agent_type ddqn --start_epsilon 0.5 --early_stopping_threshold 100 --no_gui
+```
+
+Capacity = 5
+
+```sh
+python train.py grid_configs/restA_1r.npy --train_iter 1000 --n_plates 9 --capacity 5 --eval_iter 100 --agent_type ddqn --start_epsilon 0.5 --early_stopping_threshold 100 --no_gui
+```
 
 ## Conclusion
 

@@ -169,7 +169,7 @@ def main(
                 start_epsilon=start_epsilon,
                 end_epsilon=0.01,
                 decay_steps=decay_steps,
-                gamma=0.90,
+                gamma=0.95,
                 capacity=capacity,
                 device=get_device(),
             )
@@ -260,7 +260,7 @@ def main(
             env,
             num_actions=len(range(4)),
             alpha=0.1,
-            gamma=0.9,
+            gamma=0.95,
             epsilon=init_epsilon,
             min_epsilon=min_epsilon,
             decay=decay,

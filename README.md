@@ -6,6 +6,7 @@ This project involves the development and evaluation of a reinforcement learning
     <img src="restA_floorplan.png" alt="Restaurant Floor Plan" width="200" style="display: inline-block; margin-right: 20px;"/>
     <img src="restA_grid.png" alt="Restaurant Grid" width="200" style="display: inline-block;"/>
 </div>
+
 ## Project Structure
 
 ```

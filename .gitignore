@@ -6,3 +6,4 @@ runs/Jun09_13-05-01_Annikas-MacBook-Pro.local/events.out.tfevents.1717931101.Ann
 /runs
 *.pyc
 *.pyc
+*.DS_Store

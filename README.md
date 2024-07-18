@@ -167,8 +167,6 @@ In this project, we designed and evaluated an autonomous delivery robot using re
 - H. Jahanshahi et al., "A deep reinforcement learning approach for the meal delivery problem," Knowledge-Based Systems, 2022.
 - Y. Li, "Deep reinforcement learning: An overview," arXiv preprint arXiv:1701.07274, 2017.
 
----
-
 ## Contributors
 
 - Gallé Koen
@@ -178,3 +176,5 @@ In this project, we designed and evaluated an autonomous delivery robot using re
 - Mainardi Luca
 - Sendin Martin Cristobal
 - Mihalachi Andrei
+
+---

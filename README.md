@@ -1,4 +1,4 @@
-# Reinforcement Learning Assignment 2
+# Multi-Target-Robot-Navigation-with-Double-DQN
 
 This project involves the development and evaluation of a reinforcement learning-based autonomous delivery robot functioning as a waiter in a restaurant setting. The robot's tasks include picking up plates from the kitchen, navigating the restaurant environment, and delivering food to designated tables. This project builds on the previous assignment, incorporating more complex environments and advanced RL techniques.
 
@@ -168,3 +168,13 @@ In this project, we designed and evaluated an autonomous delivery robot using re
 - Y. Li, "Deep reinforcement learning: An overview," arXiv preprint arXiv:1701.07274, 2017.
 
 ---
+
+## Contributors
+
+- Gallé Koen
+- Möller Chandiramani Annika
+- Huijten Patrick
+- Mostajeran Gourtani Aria
+- Mainardi Luca
+- Sendin Martin Cristobal
+- Mihalachi Andrei
